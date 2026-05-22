@@ -1,0 +1,36 @@
+{
+  "name": "remove middle node in three-deep chain",
+  "input": {
+    "objective": "Coordinate customer follow-up",
+    "objectiveLocked": true,
+    "lockedNodes": [],
+    "invalidatedNodes": [
+      {
+        "id": "tc_b",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "sync" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_a"]
+      }
+    ],
+    "preservedNodes": [
+      {
+        "id": "tc_a",
+        "tool": "Google.SendEmail",
+        "args": { "to": "lead@acme.com" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": []
+      },
+      {
+        "id": "tc_c",
+        "tool": "Slack.SendMessageToChannel",
+        "args": { "text": "Meeting scheduled" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_b"]
+      }
+    ]
+  }
+}

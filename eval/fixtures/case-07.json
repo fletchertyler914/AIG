@@ -1,0 +1,37 @@
+{
+  "name": "human edited node with downstream dependents",
+  "input": {
+    "objective": "Lead follow-up",
+    "objectiveLocked": true,
+    "lockedNodes": [],
+    "invalidatedNodes": [
+      {
+        "id": "tc_cal",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "old title" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_email"]
+      }
+    ],
+    "preservedNodes": [
+      {
+        "id": "tc_email",
+        "tool": "Google.SendEmail",
+        "args": { "to": "lead@acme.com", "body": "Human-edited warmer tone here." },
+        "locked": false,
+        "humanEdited": true,
+        "dependsOn": []
+      },
+      {
+        "id": "tc_slack",
+        "tool": "Slack.SendMessageToChannel",
+        "args": { "text": "Calendar invite sent" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_cal"]
+      }
+    ],
+    "humanReason": "No auto-scheduling"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "name": "human mutation preservation — edited email survives downstream regen",
+  "input": {
+    "objective": "Lead follow-up orchestration",
+    "objectiveLocked": true,
+    "lockedNodes": [],
+    "invalidatedNodes": [
+      {
+        "id": "tc_cal_globex",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "Globex call" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_email_globex"]
+      },
+      {
+        "id": "tc_slack",
+        "tool": "Slack.SendMessageToChannel",
+        "args": { "text": "Both meetings booked" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_cal_acme", "tc_cal_globex"]
+      }
+    ],
+    "preservedNodes": [
+      {
+        "id": "tc_email_acme",
+        "tool": "Google.SendEmail",
+        "args": {
+          "to": "lead@acme.com",
+          "body": "EXACT_HUMAN_EDIT: Please find time for a brief intro — no pressure."
+        },
+        "locked": false,
+        "humanEdited": true,
+        "dependsOn": []
+      },
+      {
+        "id": "tc_email_globex",
+        "tool": "Google.SendEmail",
+        "args": { "to": "lead@globex.com", "body": "Globex standard" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": []
+      },
+      {
+        "id": "tc_cal_acme",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "Acme call" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_email_acme"]
+      }
+    ],
+    "humanReason": "Don't auto-schedule Globex"
+  }
+}

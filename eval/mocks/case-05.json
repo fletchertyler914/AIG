@@ -1,0 +1,14 @@
+{
+  "replace": [
+    {
+      "tool": "Slack.SendMessageToChannel",
+      "args": {
+        "channel": "#sales-team",
+        "text": "Acme intro call scheduled. Globex follow-up email sent — no meeting scheduled."
+      },
+      "dependsOn": ["tc_cal_acme", "tc_email_globex"]
+    }
+  ],
+  "preserve": ["tc_email_acme", "tc_email_globex", "tc_cal_acme"],
+  "remove": ["tc_cal_globex", "tc_slack"]
+}

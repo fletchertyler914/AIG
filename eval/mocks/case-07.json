@@ -1,0 +1,14 @@
+{
+  "replace": [
+    {
+      "tool": "Slack.SendMessageToChannel",
+      "args": {
+        "channel": "#sales",
+        "text": "Follow-up email sent with warmer tone — no meeting scheduled."
+      },
+      "dependsOn": ["tc_email"]
+    }
+  ],
+  "preserve": ["tc_email"],
+  "remove": ["tc_cal", "tc_slack"]
+}

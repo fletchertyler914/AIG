@@ -1,0 +1,56 @@
+{
+  "name": "dependent args reference removed node output",
+  "input": {
+    "objective": "Lead follow-up orchestration",
+    "objectiveLocked": true,
+    "lockedNodes": [],
+    "invalidatedNodes": [
+      {
+        "id": "tc_cal_globex",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "Globex intro", "attendees": ["lead@globex.com"] },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_email_globex"]
+      }
+    ],
+    "preservedNodes": [
+      {
+        "id": "tc_email_acme",
+        "tool": "Google.SendEmail",
+        "args": { "to": "lead@acme.com", "body": "Acme follow-up" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": []
+      },
+      {
+        "id": "tc_email_globex",
+        "tool": "Google.SendEmail",
+        "args": { "to": "lead@globex.com", "body": "Globex follow-up" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": []
+      },
+      {
+        "id": "tc_cal_acme",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "Acme intro" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_email_acme"]
+      },
+      {
+        "id": "tc_slack",
+        "tool": "Slack.SendMessageToChannel",
+        "args": {
+          "channel": "#sales-team",
+          "text": "Scheduled Acme and Globex intro calls"
+        },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_cal_acme", "tc_cal_globex"]
+      }
+    ],
+    "humanReason": "Don't auto-schedule Globex — they prefer async"
+  }
+}

@@ -5,6 +5,12 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: false,
+    env: {
+      SKIP_ENV_VALIDATION: '1',
+      DATABASE_URL: 'postgres://test:test@localhost:5432/aig_test',
+      ANTHROPIC_API_KEY: 'test-key',
+      ARCADE_API_KEY: 'test-key',
+    },
     include: ['tests/unit/**/*.test.ts', 'eval/**/*.eval.ts'],
     exclude: ['node_modules', '.next', 'tests/e2e/**'],
     coverage: {

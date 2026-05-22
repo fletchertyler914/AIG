@@ -1,0 +1,36 @@
+{
+  "name": "remove leaf with no dependents",
+  "input": {
+    "objective": "Lead follow-up",
+    "objectiveLocked": true,
+    "lockedNodes": [],
+    "invalidatedNodes": [
+      {
+        "id": "tc_slack",
+        "tool": "Slack.SendMessageToChannel",
+        "args": { "channel": "#sales", "text": "done" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_cal"]
+      }
+    ],
+    "preservedNodes": [
+      {
+        "id": "tc_email",
+        "tool": "Google.SendEmail",
+        "args": { "to": "lead@acme.com" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": []
+      },
+      {
+        "id": "tc_cal",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "sync" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_email"]
+      }
+    ]
+  }
+}

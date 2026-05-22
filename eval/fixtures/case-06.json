@@ -1,0 +1,28 @@
+{
+  "name": "all remaining nodes locked",
+  "input": {
+    "objective": "Coordinate customer follow-up",
+    "objectiveLocked": true,
+    "lockedNodes": [
+      {
+        "id": "tc_email",
+        "tool": "Google.SendEmail",
+        "args": { "to": "lead@acme.com", "body": "Approved tone" },
+        "locked": true,
+        "humanEdited": true,
+        "dependsOn": []
+      }
+    ],
+    "invalidatedNodes": [
+      {
+        "id": "tc_cal",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "sync" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_email"]
+      }
+    ],
+    "preservedNodes": []
+  }
+}

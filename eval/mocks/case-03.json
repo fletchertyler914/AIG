@@ -1,0 +1,11 @@
+{
+  "replace": [
+    {
+      "tool": "Slack.SendMessageToChannel",
+      "args": { "channel": "#sales", "text": "Follow-up email sent to lead@acme.com" },
+      "dependsOn": ["tc_a"]
+    }
+  ],
+  "preserve": ["tc_a"],
+  "remove": ["tc_b", "tc_c"]
+}

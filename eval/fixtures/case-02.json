@@ -1,0 +1,36 @@
+{
+  "name": "remove root with two dependents",
+  "input": {
+    "objective": "Lead follow-up orchestration",
+    "objectiveLocked": true,
+    "lockedNodes": [],
+    "invalidatedNodes": [
+      {
+        "id": "tc_email_a",
+        "tool": "Google.SendEmail",
+        "args": { "to": "a@acme.com" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": []
+      }
+    ],
+    "preservedNodes": [
+      {
+        "id": "tc_cal_a",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "Acme" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_email_a"]
+      },
+      {
+        "id": "tc_cal_b",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "Globex" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_email_a"]
+      }
+    ]
+  }
+}

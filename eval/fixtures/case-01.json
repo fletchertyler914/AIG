@@ -1,0 +1,29 @@
+{
+  "name": "remove root with one dependent",
+  "input": {
+    "objective": "Coordinate customer follow-up",
+    "objectiveLocked": true,
+    "lockedNodes": [],
+    "invalidatedNodes": [
+      {
+        "id": "tc_email",
+        "tool": "Google.SendEmail",
+        "args": { "to": "lead@acme.com", "body": "Hi" },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": []
+      }
+    ],
+    "preservedNodes": [
+      {
+        "id": "tc_cal",
+        "tool": "Google.CreateEvent",
+        "args": { "title": "Acme sync", "attendees": ["lead@acme.com"] },
+        "locked": false,
+        "humanEdited": false,
+        "dependsOn": ["tc_email"]
+      }
+    ],
+    "humanReason": "Do not send email yet"
+  }
+}

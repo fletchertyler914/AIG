@@ -1,0 +1,5 @@
+{
+  "replace": [],
+  "preserve": [],
+  "remove": ["tc_email_a", "tc_cal_a", "tc_cal_b"]
+}

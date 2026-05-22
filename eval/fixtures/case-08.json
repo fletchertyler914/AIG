@@ -1,0 +1,19 @@
+{
+  "name": "edit leaf with no dependents — identity repair",
+  "input": {
+    "objective": "Notify team",
+    "objectiveLocked": true,
+    "lockedNodes": [],
+    "invalidatedNodes": [],
+    "preservedNodes": [
+      {
+        "id": "tc_slack",
+        "tool": "Slack.SendMessageToChannel",
+        "args": { "channel": "#sales", "text": "Updated message only" },
+        "locked": false,
+        "humanEdited": true,
+        "dependsOn": []
+      }
+    ]
+  }
+}
