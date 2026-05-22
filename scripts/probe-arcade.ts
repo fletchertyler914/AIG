@@ -13,7 +13,7 @@ import { logger } from '@/lib/logger'
 
 const log = logger.child({ script: 'probe-arcade' })
 
-const TARGET_TOOLKITS = ['Google', 'Slack', 'Github'] as const
+const TARGET_TOOLKITS = ['Gmail', 'GoogleCalendar', 'Slack', 'Github'] as const
 
 async function main() {
   log.info({ baseUrl: env.ARCADE_BASE_URL ?? 'default' }, 'probing arcade')

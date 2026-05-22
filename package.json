@@ -35,6 +35,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
+    "db:push:force": "drizzle-kit push --force",
     "db:studio": "drizzle-kit studio",
     "probe:arcade": "tsx scripts/probe-arcade.ts",
     "demo:seed": "tsx scripts/demo-seed.ts",
@@ -43,6 +44,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.78",
     "@arcadeai/arcadejs": "^2.4.1",
+    "@next/env": "16.2.6",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-separator": "^1.1.8",

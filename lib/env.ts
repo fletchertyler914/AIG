@@ -1,5 +1,10 @@
+import { createRequire } from 'node:module'
 import { createEnv } from '@t3-oss/env-nextjs'
 import { z } from 'zod'
+
+const require = createRequire(import.meta.url)
+const { loadEnvConfig } = require('@next/env') as typeof import('@next/env')
+loadEnvConfig(process.cwd())
 
 /**
  * Typed, validated environment access.
