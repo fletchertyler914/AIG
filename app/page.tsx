@@ -43,7 +43,7 @@ export default function HomePage() {
         <span aria-hidden>·</span>
         <Link
           className="underline-offset-4 transition hover:text-foreground hover:underline"
-          href="/docs"
+          href="https://github.com/fletchertyler914/aig/tree/main/docs/adr"
         >
           Architecture
         </Link>
