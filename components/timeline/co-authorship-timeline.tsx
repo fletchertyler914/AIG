@@ -106,7 +106,12 @@ export function CoAuthorshipTimeline({ mutations }: CoAuthorshipTimelineProps) {
         }
         const Icon = style.icon
         return (
-          <li key={mutation.id} className="relative pl-10">
+          <li
+            key={mutation.id}
+            className="relative pl-10"
+            data-testid="trace-entry"
+            data-event-type={mutation.type}
+          >
             {index < mutations.length - 1 ? (
               <div className="absolute top-8 bottom-[-1rem] left-4 w-px bg-border" />
             ) : null}

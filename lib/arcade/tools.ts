@@ -15,11 +15,45 @@ export function parseArcadeToolName(tool: string): ParsedArcadeToolName {
   }
 }
 
+/**
+ * When set, all Arcade `execute` calls short-circuit with a synthetic
+ * success. Used by Playwright + integration tests so the demo loop can
+ * exercise APPROVED → EXECUTING → COMPLETE without hitting real
+ * accounts. Never enabled in production.
+ */
+function isMocked(): boolean {
+  return process.env['E2E_MOCK_ARCADE'] === '1'
+}
+
+function mockedExecution(input: {
+  tool: string
+  args: Record<string, unknown>
+}): ExecuteToolResponse {
+  return {
+    id: `mock-${Date.now()}`,
+    duration: 0,
+    execution_id: `mock-exec-${Date.now()}`,
+    execution_type: 'immediate',
+    finished_at: new Date().toISOString(),
+    run_at: new Date().toISOString(),
+    status: 'success',
+    success: true,
+    output: {
+      value: {
+        mocked: true,
+        tool: input.tool,
+        echoedArgs: input.args,
+      },
+    },
+  } as unknown as ExecuteToolResponse
+}
+
 export async function executeArcadeTool(input: {
   tool: string
   args: Record<string, unknown>
   userId: string
 }): Promise<ExecuteToolResponse> {
+  if (isMocked()) return mockedExecution(input)
   const { toolName, toolVersion } = parseArcadeToolName(input.tool)
   return getArcadeClient().tools.execute({
     tool_name: toolName,

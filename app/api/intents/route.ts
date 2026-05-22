@@ -11,8 +11,13 @@ import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+/** Vercel serverless max — also caps any single plan attempt. */
+export const maxDuration = 60
 
 const log = logger.child({ route: 'POST /api/intents' })
+
+/** Hard ceiling on a single plan-agent invocation. */
+const PLAN_TIMEOUT_MS = 50_000
 
 const createIntentSchema = z.object({
   prompt: z.string().min(1).max(2000),
@@ -31,6 +36,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(new Error('plan agent timeout')), PLAN_TIMEOUT_MS)
+  request.signal.addEventListener('abort', () => ac.abort(request.signal.reason))
+
   try {
     const body = parseJson(createIntentSchema, await request.json())
     const userId = body.userId ?? env.DEMO_USER_ID
@@ -42,6 +51,7 @@ export async function POST(request: Request) {
       prompt: body.prompt,
       userId,
       toolkits,
+      signal: ac.signal,
       ...(body.maxSteps !== undefined ? { maxSteps: body.maxSteps } : {}),
     })
 
@@ -89,6 +99,9 @@ export async function POST(request: Request) {
     return jsonOk(result, { status: 201 })
   } catch (error) {
     log.error({ err: error }, 'failed to create intent')
-    return jsonError(messageFromUnknown(error), 400)
+    const status = ac.signal.aborted ? 504 : 400
+    return jsonError(messageFromUnknown(error), status)
+  } finally {
+    clearTimeout(timer)
   }
 }

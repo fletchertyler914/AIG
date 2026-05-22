@@ -98,6 +98,7 @@ export function IntentDashboard() {
           <h2 className="font-semibold text-xl">Plan a multi-tool intent</h2>
           <button
             className="text-muted-foreground text-xs underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
+            data-testid="run-demo"
             disabled={busy}
             onClick={runDemo}
             type="button"

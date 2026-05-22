@@ -4,7 +4,7 @@
 > Agents propose. Humans constrain. The runtime repairs. Arcade executes.
 > The negotiation is the artifact.
 
-[ Live demo ] · [ 90-second video ] · [ Architecture ]
+[ **Live demo → https://aig-eta.vercel.app** ] · [ 90-second video ] · [ Architecture ](docs/adr/)
 
 ---
 
@@ -20,21 +20,40 @@ AIG shows you **how authority evolves between human and agent before
 anything actually happens** — the negotiated execution layer that sits
 above Arcade's MCP runtime and below your LLM.
 
-### The loop
+### The loop (actual output from `pnpm live:loop` against real Claude)
 
 ```
-09:41  Agent proposed "Coordinate customer follow-up"
-       ├─ Gmail.SendEmail × 2
-       ├─ Calendar.CreateEvent × 2
-       └─ Gmail.SendEmail × 1 (internal summary)
-09:42  Human removed Calendar.CreateEvent (Globex)
-09:42  System invalidated dependent summary
-09:43  Agent regenerated downstream actions
-       └─ Summary email rewritten (no longer mentions Globex meeting)
-09:44  Human edited Gmail.SendEmail.body (Acme thread)
-09:45  Human approved
-09:45  Arcade executed in dependency order
-09:45  COMPLETE — 5/5 actions, 0 failures
+1) POST /api/intents/demo
+   intent=01KS80K0Z2B66MYNA20PG5NAB8  tool_calls=5
+
+2) GET /api/intents/[id]
+   status=PENDING_REVIEW
+   label=Lead follow-up and next-step coordination
+   tool calls:
+     · Gmail.SendEmail@7.0.0           → deps=[0]
+     · Gmail.SendEmail@7.0.0           → deps=[0]
+     · GoogleCalendar.CreateEvent@3.3.2 → deps=[1]
+     · GoogleCalendar.CreateEvent@3.3.2 → deps=[1]
+     · Gmail.SendEmail@7.0.0           → deps=[2]
+
+3) mutate — remove GoogleCalendar.CreateEvent@3.3.2
+
+4) waiting for REGENERATING → PENDING_REVIEW
+   status=PENDING_REVIEW
+   trace:
+     [0] agent/agent_proposed
+     [1] human/human_removed
+     [2] system/system_invalidated
+     [3] agent/agent_regenerated
+
+5) POST /api/intents/[id]/approve
+6) status=APPROVED
+   final trace:
+     [0] agent/agent_proposed
+     [1] human/human_removed
+     [2] system/system_invalidated
+     [3] agent/agent_regenerated
+     [4] human/human_approved
 ```
 
 That timeline — the **co-authorship trace** — is the primary artifact AIG
@@ -143,25 +162,39 @@ pnpm db:push
 pnpm dev
 ```
 
-Probe your Arcade API key works:
+Probe your Arcade API key + run the loop against real models:
 
 ```bash
-pnpm probe:arcade
+pnpm probe:arcade           # confirms Arcade key + lists authorized toolkits
+pnpm live:plan "<prompt>"   # plan-agent → labeler → authorize on real Claude+Arcade
+pnpm live:loop              # demo-route loop against dev server (create→remove→repair→approve)
+pnpm live:prompt-loop "..." # full plan-driven loop against dev server
 ```
+
+The `live:*` scripts are how this project was validated. Every iteration
+in this codebase was driven by real Claude + real Arcade output, not just
+mocks. See `scripts/live-*.ts` for the entry points.
 
 ---
 
 ## Tests
 
 ```bash
-pnpm test:unit          # lib/aig pure-module tests
-pnpm test:eval          # repair eval harness (mock LLM)
-pnpm test:eval:live     # repair eval harness (real Claude — the gate)
-pnpm test:e2e           # Playwright with mocked Arcade
+pnpm test:unit          # 77 pure-module tests (lib/aig, lib/ai, lib/arcade)
+pnpm test:eval          # 11 repair-engine cases (mock LLM, CI-fast)
+pnpm test:eval:live     # 11 repair-engine cases vs real Claude (the gate)
+pnpm test:e2e           # Playwright: dashboard → mutate → repair → approve → COMPLETE
 ```
 
-The repair eval gate: **9/9 cases must pass deterministically across 3
-consecutive `EVAL_MODE=live` runs** before the UI is considered shippable.
+The repair eval gate: **11/11 contract+invariant assertions must pass
+deterministically across 3 consecutive `EVAL_MODE=live` runs** before
+any UI work ships. This repository was last validated at 11/11 × 3
+on Claude 4.5 Sonnet.
+
+End-to-end is fully isolated from real Arcade via `E2E_MOCK_ARCADE=1`
+(executor + authorize layers short-circuit), so the demo loop test
+exercises the entire UI + state machine + executor without sending
+real email or burning Claude credits.
 
 ---
 

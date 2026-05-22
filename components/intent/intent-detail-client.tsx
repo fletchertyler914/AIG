@@ -75,7 +75,7 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
       const res = await fetch(`/api/intents/${intentId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approvedBy: 'fletchertyler914@gmail.com' }),
+        body: JSON.stringify({ approvedBy: 'fletchertyler914@gmail.com', execute: true }),
       })
       if (!res.ok) {
         toast.error(await res.text())
@@ -107,7 +107,9 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
             <Link className="text-muted-foreground text-sm hover:text-foreground" href="/">
               ← Back
             </Link>
-            <h1 className="mt-3 font-semibold text-3xl tracking-tight">{data.intent.label}</h1>
+            <h1 className="mt-3 font-semibold text-3xl tracking-tight" data-testid="intent-label">
+              {data.intent.label}
+            </h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">{data.intent.description}</p>
             <p className="mt-3 rounded-md border bg-muted p-3 text-sm">
               <span className="font-medium">Locked objective:</span> {data.intent.objective}
@@ -119,12 +121,16 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
             ) : null}
           </div>
           <div className="space-y-2 text-right">
-            <span className="inline-flex rounded-full border px-3 py-1 font-mono text-xs uppercase">
+            <span
+              className="inline-flex rounded-full border px-3 py-1 font-mono text-xs uppercase"
+              data-testid="intent-status"
+            >
               {data.intent.status}
             </span>
             <div>
               <button
                 className="rounded-md bg-primary px-4 py-2 text-primary-foreground text-sm disabled:opacity-50"
+                data-testid="approve-button"
                 disabled={isPending || data.intent.status !== 'PENDING_REVIEW'}
                 onClick={approve}
                 type="button"

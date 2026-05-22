@@ -38,6 +38,9 @@
     "db:push:force": "drizzle-kit push --force",
     "db:studio": "drizzle-kit studio",
     "probe:arcade": "tsx scripts/probe-arcade.ts",
+    "live:plan": "tsx scripts/live-plan.ts",
+    "live:loop": "tsx scripts/live-loop.ts",
+    "live:prompt-loop": "tsx scripts/live-prompt-loop.ts",
     "demo:seed": "tsx scripts/demo-seed.ts",
     "prepare": "lefthook install || true"
   },

@@ -81,10 +81,17 @@ export function ToolCallCard({ toolCall, onChanged }: ToolCallCardProps) {
   }
 
   return (
-    <article className="rounded-lg border bg-card p-4 shadow-sm">
+    <article
+      className="rounded-lg border bg-card p-4 shadow-sm"
+      data-testid="tool-call-card"
+      data-tool={toolCall.tool}
+      data-status={toolCall.status}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-medium font-mono text-sm">{toolCall.tool}</h3>
+          <h3 className="font-medium font-mono text-sm" data-testid="tool-call-name">
+            {toolCall.tool}
+          </h3>
           <p className="mt-1 text-muted-foreground text-xs">
             depends on: {toolCall.dependsOn.length > 0 ? toolCall.dependsOn.join(', ') : 'none'}
           </p>
@@ -94,6 +101,7 @@ export function ToolCallCard({ toolCall, onChanged }: ToolCallCardProps) {
             'rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-wide',
             statusClass(toolCall.status),
           )}
+          data-testid="tool-call-status"
         >
           {toolCall.status}
         </span>
@@ -134,6 +142,7 @@ export function ToolCallCard({ toolCall, onChanged }: ToolCallCardProps) {
       <div className="mt-4 flex gap-2">
         <button
           className="rounded-md border px-3 py-2 text-sm disabled:opacity-50"
+          data-testid="tool-call-edit"
           disabled={toolCall.locked || isPending || toolCall.status === 'invalidated'}
           onClick={() => setEditing(true)}
           type="button"
@@ -142,6 +151,7 @@ export function ToolCallCard({ toolCall, onChanged }: ToolCallCardProps) {
         </button>
         <button
           className="rounded-md border border-aig-removed/40 px-3 py-2 text-aig-removed text-sm disabled:opacity-50"
+          data-testid="tool-call-remove"
           disabled={toolCall.locked || isPending || toolCall.status === 'invalidated'}
           onClick={remove}
           type="button"

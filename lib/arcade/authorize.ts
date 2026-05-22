@@ -49,10 +49,18 @@ export async function authorizeMany(
   return Promise.all(ordered.map((tool) => authorizer({ tool, userId })))
 }
 
+function isMocked(): boolean {
+  return process.env['E2E_MOCK_ARCADE'] === '1'
+}
+
 async function defaultAuthorizer(input: {
   tool: string
   userId: string
 }): Promise<ToolAuthorizationStatus> {
+  if (isMocked()) {
+    return { tool: input.tool, status: 'completed' }
+  }
+
   const arcade = getArcadeClient()
   const { toolName, toolVersion } = parseArcadeToolName(input.tool)
   const res = await arcade.tools.authorize({
