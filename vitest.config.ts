@@ -10,6 +10,8 @@ export default defineConfig({
       DATABASE_URL: 'postgres://test:test@localhost:5432/aig_test',
       ANTHROPIC_API_KEY: 'test-key',
       ARCADE_API_KEY: 'test-key',
+      LOG_LEVEL: 'silent',
+      NODE_ENV: 'test',
     },
     include: ['tests/unit/**/*.test.ts', 'eval/**/*.eval.ts'],
     exclude: ['node_modules', '.next', 'tests/e2e/**'],

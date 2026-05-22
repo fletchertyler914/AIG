@@ -48,18 +48,27 @@ AIG is a **complement** to Arcade, not a competitor. Arcade owns auth,
 secure tool execution, and the OAuth lifecycle for 7,500+ tools. AIG owns
 the pre-execution governance layer:
 
-1. Plans are constructed using
-   `client.tools.formatted.list({ format: 'anthropic', toolkit })` — the
-   agent sees Arcade tool schemas directly.
-2. The agent runs in plan-only mode. Tool `input` events are captured into
-   an `Intent` (transactional grouping) — they are never executed.
-3. After human approval, `client.tools.execute({ tool_name, input, user_id })`
-   fires each call in dependency order. The `user_id` MUST equal the
-   intent's `approved_by` field — auth propagation is enforced at the
-   AIG layer before Arcade is touched.
-4. Errors halt execution by default (`HALT_REMAINING`). See
-   [ADR-0004](docs/adr/0004-halt-on-failure-rollback.md) for the rollback
-   model.
+1. **Plan agent** — `client.tools.formatted.list({ format: 'anthropic', toolkit, user_id })`
+   loads your authorized Arcade tools. Claude runs in **plan-only mode**:
+   every `execute` short-circuits and captures `tool` + `args` — nothing
+   hits a real account until you approve.
+2. **Authorization surface** — `client.tools.authorize({ tool_name, user_id })`
+   runs per unique tool. If OAuth is pending, the intent stays `UNCERTAIN`
+   and the UI shows **Authorize Gmail / Calendar** links.
+3. **Formation** — captured calls are grouped into a transactional intent
+   with a locked objective, dependency DAG, and deterministic impact summary.
+4. **Repair** — when you remove or edit a tool call, a fresh Claude session
+   repairs downstream nodes while preserving approved and human-edited ones.
+5. **Execution** — after approval, `client.tools.execute({ tool_name, input, user_id })`
+   fires in topological order. `user_id` MUST equal `approved_by` — enforced
+   at the AIG layer before Arcade is touched.
+
+**Two entry points:**
+
+| Path | Endpoint | When to use |
+|------|----------|-------------|
+| Real plan | `POST /api/intents` `{ prompt }` | Type what you want coordinated |
+| Locked demo | `POST /api/intents/demo` | Reviewers: instant lead-followup scenario |
 
 ---
 
@@ -128,7 +137,8 @@ nvm use                 # Node 22
 corepack enable
 pnpm install
 cp .env.example .env.local
-# fill in DATABASE_URL, ANTHROPIC_API_KEY, ARCADE_API_KEY
+# fill in DATABASE_URL, ANTHROPIC_API_KEY, ARCADE_API_KEY, DEMO_USER_ID
+# DEMO_USER_ID = your Arcade user_id (email) — OAuth is per-user in Arcade
 pnpm db:push
 pnpm dev
 ```

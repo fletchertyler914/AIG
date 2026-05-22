@@ -12,6 +12,36 @@ interface IntentDetailClientProps {
   intentId: string
 }
 
+interface PendingAuthorization {
+  tool: string
+  url?: string
+  providerId?: string
+  status?: string
+}
+
+function readPendingAuthorizations(impact: Record<string, unknown>): PendingAuthorization[] {
+  const raw = impact['pendingAuthorizations']
+  if (!Array.isArray(raw)) return []
+  const out: PendingAuthorization[] = []
+  for (const row of raw) {
+    if (typeof row !== 'object' || row === null) continue
+    const r = row as Record<string, unknown>
+    const tool = String(r['tool'] ?? '')
+    if (!tool) continue
+    const entry: PendingAuthorization = { tool }
+    if (typeof r['url'] === 'string') entry.url = r['url']
+    if (typeof r['providerId'] === 'string') entry.providerId = r['providerId']
+    if (typeof r['status'] === 'string') entry.status = r['status']
+    out.push(entry)
+  }
+  return out
+}
+
+function toolkitLabel(tool: string): string {
+  const dot = tool.indexOf('.')
+  return dot === -1 ? tool : tool.slice(0, dot)
+}
+
 async function fetchIntent(intentId: string): Promise<IntentWithTraceDto> {
   const res = await fetch(`/api/intents/${intentId}`, { cache: 'no-store' })
   if (!res.ok) throw new Error(await res.text())
@@ -51,7 +81,7 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
         toast.error(await res.text())
         return
       }
-      toast.success('Intent approved. Execution lands in Phase 4.')
+      toast.success('Intent approved — Arcade execution started.')
       await refresh()
     })
   }
@@ -66,6 +96,8 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
 
   const impact = asRecord(data.intent.impact)
   const bySystem = asRecord(impact['bySystem'])
+  const pendingAuths = readPendingAuthorizations(impact)
+  const agentSummary = typeof impact['agentSummary'] === 'string' ? impact['agentSummary'] : null
 
   return (
     <main className="mx-auto grid w-full max-w-7xl flex-1 gap-6 px-6 py-8 lg:grid-cols-[minmax(0,1fr)_420px]">
@@ -80,6 +112,11 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
             <p className="mt-3 rounded-md border bg-muted p-3 text-sm">
               <span className="font-medium">Locked objective:</span> {data.intent.objective}
             </p>
+            {agentSummary ? (
+              <p className="mt-2 text-muted-foreground text-sm">
+                <span className="font-medium text-foreground">Agent summary:</span> {agentSummary}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2 text-right">
             <span className="inline-flex rounded-full border px-3 py-1 font-mono text-xs uppercase">
@@ -97,6 +134,45 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
             </div>
           </div>
         </div>
+
+        {pendingAuths.length > 0 ? (
+          <section className="rounded-lg border border-aig-modified/40 bg-aig-modified/5 p-4">
+            <p className="font-mono text-aig-modified text-xs uppercase tracking-widest">
+              Arcade authorization required
+            </p>
+            <p className="mt-1 text-sm">
+              The plan referenced toolkits this Arcade user has not yet authorized. Complete the
+              OAuth flows below, then refresh — the intent will move out of UNCERTAIN.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {pendingAuths.map((auth) => (
+                <li
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3 text-sm"
+                  key={auth.tool}
+                >
+                  <div>
+                    <p className="font-medium">{toolkitLabel(auth.tool)}</p>
+                    <p className="text-muted-foreground text-xs">{auth.tool}</p>
+                  </div>
+                  {auth.url ? (
+                    <a
+                      className="rounded-md border bg-primary px-3 py-1.5 font-mono text-primary-foreground text-xs uppercase tracking-wide hover:opacity-90"
+                      href={auth.url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Authorize {toolkitLabel(auth.tool)}
+                    </a>
+                  ) : (
+                    <span className="font-mono text-muted-foreground text-xs uppercase">
+                      {auth.status ?? 'unknown'}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         <section className="grid gap-3 sm:grid-cols-3">
           {Object.entries(bySystem).map(([system, count]) => (
