@@ -1,0 +1,43 @@
+---
+description: Better Auth, tenancy, and session boundaries
+globs:
+  - "lib/auth/**"
+  - "lib/db/auth-schema.ts"
+  - "lib/db/workspace-queries.ts"
+  - "app/api/auth/**"
+  - "app/app/**/layout.tsx"
+alwaysApply: false
+---
+
+# Auth & Tenancy Rules
+
+See ADR-0009 and ADR-0010.
+
+## Import boundaries
+
+- `better-auth` is imported ONLY from `lib/auth/server.ts` (server) and
+  `lib/auth/client.ts` (browser). Nowhere else.
+- Authenticated API routes MUST call `resolveWorkspaceContext()` from
+  `lib/auth/session.ts` — not ad-hoc session reads.
+- `lib/aig/*` and `lib/arcade/*` MUST NOT import `lib/auth/*`.
+
+## Tenancy model
+
+- **Organization** — Better Auth `organization` plugin (company tenant).
+- **Workspace** — AIG `workspaces` table (`production` | `sandbox`) scoped to org.
+- **Default bootstrap** — `lib/auth/provision.ts` creates org + production workspace
+  on first sign-in.
+
+## Session vs Arcade identity
+
+| Layer | Identity | Purpose |
+| ----- | -------- | ------- |
+| AIG sign-in | Better Auth user id + email | App access, audit, approver |
+| Arcade OAuth | `user:{userId}` or `workspace:{workspaceId}` | Tool authorization + execute |
+
+These are intentionally separate. Never conflate them.
+
+## E2E / dev bypass
+
+- `E2E_SKIP_AUTH=1` — anonymous workspace context for Playwright (see ADR-0009).
+- Magic links without `RESEND_API_KEY` log to console in development only.

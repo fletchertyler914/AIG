@@ -1,12 +1,21 @@
 'use client'
 
+import { ArrowLeft, CheckCircle2, LayoutGrid, List, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { ToolCallCard } from '@/components/intent/tool-call-card'
+import { IntentCanvas } from '@/components/intent/intent-canvas'
+import { IntentCanvasList } from '@/components/intent/intent-canvas-list'
+import { IntentSidePanel } from '@/components/intent/intent-side-panel'
+import { IntentTraceDrawer } from '@/components/intent/intent-trace-drawer'
 import type { IntentWithTraceDto } from '@/components/intent/types'
 import { asRecord } from '@/components/intent/types'
-import { CoAuthorshipTimeline } from '@/components/timeline/co-authorship-timeline'
+import { IntentStatusBadge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Container } from '@/components/ui/container'
+import { formatToolkitDisplayName } from '@/lib/display/toolkits'
+import { cn } from '@/lib/utils'
 
 interface IntentDetailClientProps {
   intentId: string
@@ -18,6 +27,8 @@ interface PendingAuthorization {
   providerId?: string
   status?: string
 }
+
+type ViewMode = 'canvas' | 'list'
 
 function readPendingAuthorizations(impact: Record<string, unknown>): PendingAuthorization[] {
   const raw = impact['pendingAuthorizations']
@@ -37,11 +48,6 @@ function readPendingAuthorizations(impact: Record<string, unknown>): PendingAuth
   return out
 }
 
-function toolkitLabel(tool: string): string {
-  const dot = tool.indexOf('.')
-  return dot === -1 ? tool : tool.slice(0, dot)
-}
-
 async function fetchIntent(intentId: string): Promise<IntentWithTraceDto> {
   const res = await fetch(`/api/intents/${intentId}`, { cache: 'no-store' })
   if (!res.ok) throw new Error(await res.text())
@@ -50,6 +56,8 @@ async function fetchIntent(intentId: string): Promise<IntentWithTraceDto> {
 
 export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
   const [data, setData] = useState<IntentWithTraceDto | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('canvas')
   const [isPending, startTransition] = useTransition()
 
   const refresh = useCallback(async () => {
@@ -57,17 +65,34 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
   }, [intentId])
 
   useEffect(() => {
-    void refresh()
+    let cancelled = false
+    let source: EventSource | null = null
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
 
-    const source = new EventSource(`/api/intents/${intentId}/stream`)
-    source.addEventListener('intent', (event) => {
-      const message = event as MessageEvent<string>
-      setData(JSON.parse(message.data) as IntentWithTraceDto)
-    })
-    source.addEventListener('error', () => {
-      source.close()
-    })
-    return () => source.close()
+    const connect = () => {
+      if (cancelled) return
+      source = new EventSource(`/api/intents/${intentId}/stream`)
+      source.addEventListener('intent', (event) => {
+        const message = event as MessageEvent<string>
+        setData(JSON.parse(message.data) as IntentWithTraceDto)
+      })
+      source.addEventListener('error', () => {
+        source?.close()
+        source = null
+        if (!cancelled) {
+          retryTimer = setTimeout(connect, 2_000)
+        }
+      })
+    }
+
+    void refresh()
+    connect()
+
+    return () => {
+      cancelled = true
+      source?.close()
+      if (retryTimer) clearTimeout(retryTimer)
+    }
   }, [intentId, refresh])
 
   const approve = () => {
@@ -75,7 +100,7 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
       const res = await fetch(`/api/intents/${intentId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approvedBy: 'fletchertyler914@gmail.com', execute: true }),
+        body: JSON.stringify({ execute: true }),
       })
       if (!res.ok) {
         toast.error(await res.text())
@@ -88,9 +113,11 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
 
   if (!data) {
     return (
-      <main className="mx-auto flex w-full max-w-6xl flex-1 items-center justify-center px-6 py-16">
-        <p className="text-muted-foreground">Loading intent...</p>
-      </main>
+      <Container width="wide" className="flex flex-1 items-center justify-center py-20">
+        <p className="font-mono text-muted-foreground text-sm uppercase tracking-widest">
+          Loading intent…
+        </p>
+      </Container>
     )
   }
 
@@ -98,114 +125,157 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
   const bySystem = asRecord(impact['bySystem'])
   const pendingAuths = readPendingAuthorizations(impact)
   const agentSummary = typeof impact['agentSummary'] === 'string' ? impact['agentSummary'] : null
+  const canApprove = data.intent.status === 'PENDING_REVIEW' && pendingAuths.length === 0
 
   return (
-    <main className="mx-auto grid w-full max-w-7xl flex-1 gap-6 px-6 py-8 lg:grid-cols-[minmax(0,1fr)_420px]">
-      <section className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <Link className="text-muted-foreground text-sm hover:text-foreground" href="/">
-              ← Back
-            </Link>
-            <h1 className="mt-3 font-semibold text-3xl tracking-tight" data-testid="intent-label">
-              {data.intent.label}
-            </h1>
-            <p className="mt-2 max-w-3xl text-muted-foreground">{data.intent.description}</p>
-            <p className="mt-3 rounded-md border bg-muted p-3 text-sm">
-              <span className="font-medium">Locked objective:</span> {data.intent.objective}
-            </p>
-            {agentSummary ? (
-              <p className="mt-2 text-muted-foreground text-sm">
-                <span className="font-medium text-foreground">Agent summary:</span> {agentSummary}
-              </p>
-            ) : null}
-          </div>
-          <div className="space-y-2 text-right">
-            <span
-              className="inline-flex rounded-full border px-3 py-1 font-mono text-xs uppercase"
-              data-testid="intent-status"
-            >
-              {data.intent.status}
-            </span>
-            <div>
-              <button
-                className="rounded-md bg-primary px-4 py-2 text-primary-foreground text-sm disabled:opacity-50"
-                data-testid="approve-button"
-                disabled={isPending || data.intent.status !== 'PENDING_REVIEW'}
-                onClick={approve}
-                type="button"
+    <div className="flex min-h-0 flex-1 flex-col pb-14">
+      <Container width="wide" className="flex flex-col gap-5 py-5 sm:gap-6 sm:py-6">
+        {/* Sticky chrome */}
+        <div className="sticky top-16 z-10 -mx-4 border-border border-b bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/app"
+                className="inline-flex items-center gap-1.5 text-muted-foreground text-sm transition-colors hover:text-foreground"
               >
-                Approve intent
+                <ArrowLeft className="size-4" />
+                Back to runs
+              </Link>
+              <span className="hidden h-4 w-px bg-border sm:inline" aria-hidden />
+              <IntentStatusBadge status={data.intent.status} data-testid="intent-status" />
+              {data.intent.systems.map((system) => (
+                <span
+                  key={system}
+                  className="inline-flex items-center rounded-full border border-border bg-surface-2 px-2.5 py-0.5 text-[11px] text-muted-foreground"
+                >
+                  {formatToolkitDisplayName(system)}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="lg"
+                variant="display"
+                data-testid="approve-button"
+                disabled={isPending || !canApprove}
+                onClick={approve}
+                className="gap-2"
+              >
+                <CheckCircle2 className="size-4" />
+                {data.intent.status === 'PENDING_REVIEW'
+                  ? isPending
+                    ? 'Approving…'
+                    : 'Approve intent'
+                  : data.intent.status === 'EXECUTING'
+                    ? 'Executing…'
+                    : data.intent.status === 'COMPLETE'
+                      ? 'Executed'
+                      : data.intent.status}
+              </Button>
+            </div>
+          </div>
+          {pendingAuths.length > 0 ? (
+            <p className="mt-2 text-muted-foreground text-xs">
+              Review and edit the plan below. Authorize toolkits in the panel to enable approval.
+            </p>
+          ) : null}
+        </div>
+
+        {/* Title block */}
+        <header className="space-y-2">
+          <h1
+            className="font-mono font-semibold text-2xl uppercase tracking-tight sm:text-3xl"
+            data-testid="intent-label"
+          >
+            {data.intent.label}
+          </h1>
+          <p className="max-w-3xl text-muted-foreground leading-relaxed">
+            {data.intent.description}
+          </p>
+        </header>
+
+        {/* Locked objective */}
+        <Card tone="elevated" className="border-aig-pending/40 bg-aig-pending/[0.04]">
+          <CardContent className="flex flex-col gap-2 p-4 sm:p-5">
+            <div className="flex items-center gap-2">
+              <Lock className="size-4 text-aig-pending" />
+              <p className="font-mono text-[10px] text-aig-pending uppercase tracking-widest">
+                Locked objective:
+              </p>
+            </div>
+            <p className="font-medium text-foreground text-sm leading-relaxed">
+              {data.intent.objective}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Workspace: canvas/list + side panel */}
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+              Execution graph
+            </p>
+            <div className="inline-flex border border-border bg-surface-2 p-0.5">
+              <button
+                type="button"
+                data-testid="view-canvas"
+                onClick={() => setViewMode('canvas')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors',
+                  viewMode === 'canvas'
+                    ? 'bg-background text-foreground shadow-arcade'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <LayoutGrid className="size-3.5" />
+                Canvas
+              </button>
+              <button
+                type="button"
+                data-testid="view-list"
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors',
+                  viewMode === 'list'
+                    ? 'bg-background text-foreground shadow-arcade'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <List className="size-3.5" />
+                List
               </button>
             </div>
           </div>
-        </div>
 
-        {pendingAuths.length > 0 ? (
-          <section className="rounded-lg border border-aig-modified/40 bg-aig-modified/5 p-4">
-            <p className="font-mono text-aig-modified text-xs uppercase tracking-widest">
-              Arcade authorization required
-            </p>
-            <p className="mt-1 text-sm">
-              The plan referenced toolkits this Arcade user has not yet authorized. Complete the
-              OAuth flows below, then refresh — the intent will move out of UNCERTAIN.
-            </p>
-            <ul className="mt-3 space-y-2">
-              {pendingAuths.map((auth) => (
-                <li
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3 text-sm"
-                  key={auth.tool}
-                >
-                  <div>
-                    <p className="font-medium">{toolkitLabel(auth.tool)}</p>
-                    <p className="text-muted-foreground text-xs">{auth.tool}</p>
-                  </div>
-                  {auth.url ? (
-                    <a
-                      className="rounded-md border bg-primary px-3 py-1.5 font-mono text-primary-foreground text-xs uppercase tracking-wide hover:opacity-90"
-                      href={auth.url}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      Authorize {toolkitLabel(auth.tool)}
-                    </a>
-                  ) : (
-                    <span className="font-mono text-muted-foreground text-xs uppercase">
-                      {auth.status ?? 'unknown'}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)] lg:items-start">
+            {viewMode === 'canvas' ? (
+              <IntentCanvas
+                toolCalls={data.toolCalls}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
+            ) : (
+              <IntentCanvasList
+                toolCalls={data.toolCalls}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
+            )}
 
-        <section className="grid gap-3 sm:grid-cols-3">
-          {Object.entries(bySystem).map(([system, count]) => (
-            <div key={system} className="rounded-lg border bg-card p-4">
-              <p className="font-mono text-muted-foreground text-xs uppercase">{system}</p>
-              <p className="mt-2 font-semibold text-2xl">{String(count)}</p>
-            </div>
-          ))}
-        </section>
-
-        <section className="space-y-3">
-          <h2 className="font-semibold text-xl">Tool calls</h2>
-          <div className="grid gap-4">
-            {data.toolCalls.map((toolCall) => (
-              <ToolCallCard key={toolCall.id} toolCall={toolCall} onChanged={refresh} />
-            ))}
+            <IntentSidePanel
+              toolCalls={data.toolCalls}
+              selectedId={selectedId}
+              bySystem={bySystem}
+              agentSummary={agentSummary}
+              pendingAuths={pendingAuths}
+              returnTo={`/app/intent/${intentId}`}
+              onChanged={refresh}
+            />
           </div>
         </section>
-      </section>
+      </Container>
 
-      <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
-        <div>
-          <p className="font-mono text-muted-foreground text-xs uppercase">Primary artifact</p>
-          <h2 className="mt-1 font-semibold text-xl">Co-authorship trace</h2>
-        </div>
-        <CoAuthorshipTimeline mutations={data.mutations} />
-      </aside>
-    </main>
+      <IntentTraceDrawer mutations={data.mutations} />
+    </div>
   )
 }

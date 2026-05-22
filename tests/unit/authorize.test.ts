@@ -1,13 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
 import { authorizeMany, hasPendingAuthorizations } from '@/lib/arcade/authorize'
+import { personalArcadeIdentity } from '@/lib/arcade/identity'
+
+const personal = personalArcadeIdentity('tester-1')
 
 describe('authorizeMany', () => {
   it('dedupes tool names by first appearance and preserves order', async () => {
     const calls: string[] = []
-    const authorizer = vi.fn(async ({ tool }: { tool: string; userId: string }) => {
-      calls.push(tool)
-      return { tool, status: 'completed' as const }
-    })
+    const authorizer = vi.fn(
+      async ({ tool, identity: id }: { tool: string; identity: { kind: string } }) => {
+        calls.push(tool)
+        expect(id.kind).toBe('personal')
+        return { tool, status: 'completed' as const }
+      },
+    )
 
     const result = await authorizeMany(
       [
@@ -16,7 +22,7 @@ describe('authorizeMany', () => {
         'Gmail.SendEmail@7.0.0',
         'Gmail.SendEmail@7.0.0',
       ],
-      'tester@example.com',
+      personal,
       { authorizer },
     )
 
@@ -29,7 +35,7 @@ describe('authorizeMany', () => {
   })
 
   it('surfaces pending authorizations with url + providerId', async () => {
-    const result = await authorizeMany(['Gmail.SendEmail@7.0.0'], 'tester@example.com', {
+    const result = await authorizeMany(['Gmail.SendEmail@7.0.0'], personal, {
       authorizer: async () => ({
         tool: 'Gmail.SendEmail@7.0.0',
         status: 'pending',

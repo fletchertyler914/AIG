@@ -58,6 +58,12 @@ const testEnv: Record<string, string> = {
   LOG_LEVEL: 'silent',
   NODE_ENV: 'test',
   EVAL_MODE: evalMode,
+  BETTER_AUTH_SECRET:
+    process.env['BETTER_AUTH_SECRET'] ??
+    envLocal['BETTER_AUTH_SECRET'] ??
+    'test-secret-must-be-at-least-32-characters',
+  BETTER_AUTH_URL:
+    process.env['BETTER_AUTH_URL'] ?? envLocal['BETTER_AUTH_URL'] ?? 'http://localhost:3000',
 }
 
 if (process.env['RUN_ARCADE_INTEGRATION']) {

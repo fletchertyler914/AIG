@@ -57,7 +57,18 @@ export async function getIntentWithTrace(intentId: string): Promise<IntentWithTr
   return { intent, toolCalls: tcs, mutations: muts }
 }
 
-export async function listRecentIntents(limit = 25): Promise<Intent[]> {
+export async function listRecentIntents(
+  input: { workspaceId?: string; limit?: number } = {},
+): Promise<Intent[]> {
+  const limit = input.limit ?? 25
+  if (input.workspaceId) {
+    return db
+      .select()
+      .from(intents)
+      .where(eq(intents.workspaceId, input.workspaceId))
+      .orderBy(sql`${intents.createdAt} desc`)
+      .limit(limit)
+  }
   return db.select().from(intents).orderBy(sql`${intents.createdAt} desc`).limit(limit)
 }
 
@@ -72,6 +83,10 @@ export async function getToolCallsForIntent(intentId: string): Promise<ToolCall[
 // ── Creation ─────────────────────────────────────────────────────────────────
 
 export interface CreateIntentInput {
+  /** Tenant boundary — every intent belongs to exactly one workspace. */
+  workspaceId: string
+  /** User who initiated the run. Null for system/scheduled runs. */
+  createdByUserId: string | null
   label: string
   description: string
   objective: string
@@ -109,6 +124,8 @@ export async function createIntent(input: CreateIntentInput): Promise<CreateInte
 
     await tx.insert(intents).values({
       id: intentId,
+      workspaceId: input.workspaceId,
+      createdByUserId: input.createdByUserId,
       label: input.label,
       description: input.description,
       objective: input.objective,
@@ -200,9 +217,22 @@ export async function setIntentStatus(
   })
 }
 
+export async function updateIntentImpact(
+  intentId: string,
+  impact: Record<string, unknown>,
+): Promise<Intent | null> {
+  const [updated] = await db
+    .update(intents)
+    .set({ impact })
+    .where(eq(intents.id, intentId))
+    .returning()
+  return updated ?? null
+}
+
 export async function markIntentApproved(
   intentId: string,
   approvedBy: string,
+  approvedByUserId?: string | null,
 ): Promise<Intent | null> {
   return db.transaction(async (tx) => {
     const [current] = await tx
@@ -219,6 +249,7 @@ export async function markIntentApproved(
       .set({
         status: 'APPROVED',
         approvedBy,
+        approvedByUserId: approvedByUserId ?? null,
         approvedAt: now,
       })
       .where(eq(intents.id, intentId))

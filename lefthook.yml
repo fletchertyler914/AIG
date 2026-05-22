@@ -14,6 +14,8 @@ pre-commit:
 pre-push:
   parallel: false
   commands:
+    boundaries:
+      run: pnpm check:boundaries
     test:
       run: pnpm test:unit
     eval-mock:

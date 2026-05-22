@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'AIG — Arcade Intent Graph',
-  description: 'A pre-execution governance runtime for Arcade-powered AI agents.',
+  title: 'AIG — Control plane for Arcade pipelines',
+  description:
+    'Governance, orchestration, and audit for Arcade-powered AI agents. Intent graphs, approval policies, and workspace-scoped connections.',
   authors: [{ name: 'Tyler Fletcher', url: 'https://github.com/fletchertyler914' }],
   metadataBase: new URL('https://arcadeintent.graph'),
   openGraph: {

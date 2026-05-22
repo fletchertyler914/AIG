@@ -1,5 +1,5 @@
-import { IntentDashboard } from '@/components/intent/intent-dashboard'
+import { LandingPage } from '@/components/landing/landing-page'
 
 export default function HomePage() {
-  return <IntentDashboard />
+  return <LandingPage />
 }

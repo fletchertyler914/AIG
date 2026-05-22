@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { authorizeMany } from '@/lib/arcade/authorize'
 import { getArcadeClient } from '@/lib/arcade/client'
+import { personalArcadeIdentity, toArcadeUserId } from '@/lib/arcade/identity'
 import { executeArcadeTool } from '@/lib/arcade/tools'
 import { env } from '@/lib/env'
 
@@ -9,6 +10,8 @@ const liveDescribe = runLive ? describe : describe.skip
 
 const WRITE_TOOLS = ['Gmail.SendEmail@7.0.0', 'GoogleCalendar.CreateEvent@3.3.2'] as const
 const READONLY_TOOL = 'Gmail.WhoAmI@7.0.0'
+const DEMO_ARCADE_ID = toArcadeUserId(personalArcadeIdentity('demo'))
+const DEMO_ARCADE_IDENTITY = personalArcadeIdentity('demo')
 
 interface JsonRpcResponse {
   jsonrpc?: string
@@ -103,7 +106,7 @@ liveDescribe('Arcade live integration', () => {
   })
 
   it('checks real Arcade OAuth status for write tools without executing them', async () => {
-    const statuses = await authorizeMany(WRITE_TOOLS, env.DEMO_USER_ID)
+    const statuses = await authorizeMany(WRITE_TOOLS, DEMO_ARCADE_IDENTITY)
 
     expect(statuses).toHaveLength(WRITE_TOOLS.length)
     for (const status of statuses) {
@@ -120,18 +123,18 @@ liveDescribe('Arcade live integration', () => {
       return
     }
 
-    const [auth] = await authorizeMany([READONLY_TOOL], env.DEMO_USER_ID)
+    const [auth] = await authorizeMany([READONLY_TOOL], DEMO_ARCADE_IDENTITY)
     expect(auth).toBeDefined()
     if (auth?.status !== 'completed') {
       throw new Error(
-        `${READONLY_TOOL} is not authorized for ${env.DEMO_USER_ID}; authorize it first: ${auth?.url ?? 'no OAuth URL returned'}`,
+        `${READONLY_TOOL} is not authorized for ${DEMO_ARCADE_ID}; authorize it first: ${auth?.url ?? 'no OAuth URL returned'}`,
       )
     }
 
     const result = await executeArcadeTool({
       tool: READONLY_TOOL,
       args: {},
-      userId: env.DEMO_USER_ID,
+      userId: DEMO_ARCADE_ID,
     })
 
     expect(result.success).not.toBe(false)

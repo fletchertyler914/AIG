@@ -40,6 +40,10 @@ if (!useExternalServer) {
     env: {
       NODE_ENV: useProdBuild ? 'production' : 'test',
       E2E_MOCK_ARCADE: '1',
+      E2E_SKIP_AUTH: '1',
+      BETTER_AUTH_SECRET:
+        process.env['BETTER_AUTH_SECRET'] ?? 'e2e-test-secret-must-be-at-least-32-chars-long',
+      BETTER_AUTH_URL: process.env['BETTER_AUTH_URL'] ?? BASE_URL,
       // Plan-agent route in prod build still requires this; mocked Arcade
       // short-circuits the actual tool execution, but the route imports
       // anthropic provider config which needs *some* key to load.

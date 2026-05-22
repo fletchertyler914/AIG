@@ -108,7 +108,15 @@ const demoLabeler = async (): Promise<LabelResult> => ({
   ],
 })
 
-export async function buildDemoIntentInput(): Promise<CreateIntentInput> {
+interface BuildDemoIntentArgs {
+  workspaceId: string
+  createdByUserId: string | null
+}
+
+export async function buildDemoIntentInput({
+  workspaceId,
+  createdByUserId,
+}: BuildDemoIntentArgs): Promise<CreateIntentInput> {
   const windowId = ulid()
   const candidate = await formCandidateIntent({
     calls: demoCalls(windowId),
@@ -116,6 +124,8 @@ export async function buildDemoIntentInput(): Promise<CreateIntentInput> {
   })
 
   return {
+    workspaceId,
+    createdByUserId,
     label: candidate.label,
     description: candidate.description,
     objective: candidate.objective,

@@ -1,5 +1,6 @@
 import { buildDemoIntentInput } from '@/lib/api/demo-intent'
 import { jsonError, jsonOk, messageFromUnknown } from '@/lib/api/http'
+import { resolveWorkspaceContext } from '@/lib/auth/session'
 import { createIntent } from '@/lib/db/queries'
 import { logger } from '@/lib/logger'
 
@@ -15,7 +16,11 @@ const log = logger.child({ route: 'POST /api/intents/demo' })
  */
 export async function POST() {
   try {
-    const input = await buildDemoIntentInput()
+    const ctx = await resolveWorkspaceContext()
+    const input = await buildDemoIntentInput({
+      workspaceId: ctx.workspace.id,
+      createdByUserId: ctx.userId === 'anonymous' ? null : ctx.userId,
+    })
     const result = await createIntent(input)
     log.info({ intentId: result.intentId }, 'demo intent created (fast-path)')
     return jsonOk(result, { status: 201 })

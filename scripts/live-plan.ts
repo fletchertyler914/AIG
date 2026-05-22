@@ -12,6 +12,7 @@ import { createLlmLabeler } from '@/lib/ai/labeler'
 import { runPlanAgent } from '@/lib/ai/plan-agent'
 import { formCandidateIntent } from '@/lib/aig/formation'
 import { authorizeMany } from '@/lib/arcade/authorize'
+import { personalArcadeIdentity } from '@/lib/arcade/identity'
 import { env } from '@/lib/env'
 
 const prompt =
@@ -75,7 +76,7 @@ async function main() {
   console.log('\nRunning authorize on captured tools...')
   const auths = await authorizeMany(
     candidate.toolCalls.map((c) => c.tool),
-    env.DEMO_USER_ID,
+    personalArcadeIdentity('demo'),
   )
   const t3 = Date.now()
 

@@ -4,7 +4,7 @@
 > Agents propose. Humans constrain. The runtime repairs. Arcade executes.
 > The negotiation is the artifact.
 
-[ **Live demo → https://aig-eta.vercel.app** ] · [ 90-second video ] · [ Architecture ](docs/adr/)
+[ **Live demo → https://aig-eta.vercel.app** ] · [ 90-second video ] · [ Architecture ](docs/adr/README.md)
 
 ---
 
@@ -79,8 +79,25 @@ the pre-execution governance layer:
 4. **Repair** — when you remove or edit a tool call, a fresh Claude session
    repairs downstream nodes while preserving approved and human-edited ones.
 5. **Execution** — after approval, `client.tools.execute({ tool_name, input, user_id })`
-   fires in topological order. `user_id` MUST equal `approved_by` — enforced
-   at the AIG layer before Arcade is touched.
+   fires in topological order. Each tool resolves a **scoped connection**
+   (personal → shared) and validates the approver against that scope before
+   Arcade is called (ADR-0010).
+
+## Control plane (beyond the intent graph)
+
+AIG is evolving into Arcade's **pre-execution governance control plane** (ADR-0009):
+
+| Surface | Route | Status |
+| ------- | ----- | ------ |
+| Runs (intents) | `/app` | Shipped — graph review, form args editor, live SSE |
+| Connections (toolkit OAuth) | `/app/connections` | Shipped — personal + workspace scope |
+| Pipelines | `/app/pipelines` | Placeholder (Sprint 3) |
+| Insights | `/app/insights` | Placeholder (Sprint 5) |
+| Settings | `/app/settings` | Placeholder |
+
+Sign-in: Better Auth magic link. Tenancy: org + `production` workspace per user.
+
+---
 
 **Two entry points:**
 
@@ -126,7 +143,7 @@ the pre-execution governance layer:
                        OAuth + tool execution
 ```
 
-See [`docs/adr/`](docs/adr/) for the locked architectural decisions.
+See [`docs/adr/README.md`](docs/adr/README.md) for locked architectural decisions.
 
 ---
 
@@ -143,6 +160,7 @@ See [`docs/adr/`](docs/adr/) for the locked architectural decisions.
 | Validation  | zod v4 + @t3-oss/env-nextjs         |
 | Quality     | Biome v2 (lint + format)            |
 | Testing     | Vitest 4 + Playwright 1.60          |
+| Auth        | Better Auth (magic link + orgs)     |
 | Hooks       | Lefthook + commitlint               |
 | Logging     | pino (OTel-compatible)              |
 | Deployment  | Vercel                              |
@@ -156,8 +174,9 @@ nvm use                 # Node 22
 corepack enable
 pnpm install
 cp .env.example .env.local
-# fill in DATABASE_URL, ANTHROPIC_API_KEY, ARCADE_API_KEY, DEMO_USER_ID
-# DEMO_USER_ID = your Arcade user_id (email) — OAuth is per-user in Arcade
+# Required: DATABASE_URL, ANTHROPIC_API_KEY, ARCADE_API_KEY,
+#   BETTER_AUTH_SECRET, BETTER_AUTH_URL
+# Optional: RESEND_API_KEY (dev magic links log to console if unset)
 pnpm db:push
 pnpm dev
 ```
@@ -180,10 +199,10 @@ mocks. See `scripts/live-*.ts` for the entry points.
 ## Tests
 
 ```bash
-pnpm test:unit          # 77 pure-module tests (lib/aig, lib/ai, lib/arcade)
+pnpm test:unit          # pure-module tests (lib/aig, lib/ai, lib/arcade, …)
 pnpm test:arcade:live   # real Arcade SDK + MCP gateway integration checks
-pnpm test:eval          # 11 repair-engine cases (mock LLM, CI-fast)
-pnpm test:eval:live     # 11 repair-engine cases vs real Claude (the gate)
+pnpm test:eval          # 9 repair-engine cases (mock LLM, CI-fast)
+pnpm test:eval:live     # 9 repair-engine cases vs real Claude (the gate)
 pnpm test:e2e           # Playwright: dashboard → mutate → repair → approve → COMPLETE
 ```
 
@@ -204,10 +223,9 @@ RUN_ARCADE_READONLY_EXECUTION=1 pnpm test:arcade:live
 executes write tools. If `RUN_ARCADE_READONLY_EXECUTION=1` is set and
 `Gmail.WhoAmI` is authorized, it also executes that read-only tool.
 
-The repair eval gate: **11/11 contract+invariant assertions must pass
+The repair eval gate: **9/9 contract+invariant assertions must pass
 deterministically across 3 consecutive `EVAL_MODE=live` runs** before
-any UI work ships. This repository was last validated at 11/11 × 3
-on Claude 4.5 Sonnet.
+shipping repair prompt changes.
 
 End-to-end remains fully isolated from real Arcade via `E2E_MOCK_ARCADE=1`
 (executor + authorize layers short-circuit), so the demo loop test exercises
@@ -223,7 +241,29 @@ burning Claude credits.
 - Semantic causality metadata on DAG edges
 - Cross-window intent merging
 - Multi-agent / multi-session concurrency
-- RBAC / role policies
+- Fine-grained RBAC (org owner/admin gates shared connections only)
 - Compensating-transaction rollback (designed in [ADR-0004](docs/adr/0004-halt-on-failure-rollback.md), not built)
 
 Each omission has a reason. See [`AGENTS.md`](AGENTS.md) §8.
+
+---
+
+## License
+
+AIG is **source-available** under the [Functional Source License, Version 1.1,
+MIT Future License](LICENSE.md) (`FSL-1.1-MIT`).
+
+What this means in practice:
+
+- **You may** read the source, run it for your own internal use, fork it,
+  modify it, contribute back, and use it for non-commercial education or
+  research.
+- **You may not** offer AIG (or a substantially similar service built from this
+  code) as a commercial product that competes with this project.
+- **Two-year MIT fallback.** Each released version automatically converts to
+  the standard MIT license on the second anniversary of its release date. The
+  current commit isn't trapped in a proprietary license — it's on a two-year
+  clock to fully open source.
+
+If you want to use AIG in a way the FSL doesn't permit (e.g. embedding it in
+a commercial product), open an issue to discuss a commercial license.

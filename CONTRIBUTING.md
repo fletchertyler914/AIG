@@ -2,10 +2,10 @@
 
 Thanks for opening this repo. Before you touch code:
 
-1. Read `AGENTS.md` end-to-end. The module boundaries and stack invariants
-   listed there are enforced by Cursor rules, Biome, and CI.
-2. Read the ADRs in `docs/adr/`. Any change that contradicts an ADR requires
-   a new ADR superseding it.
+1. Read `AGENTS.md` end-to-end — module boundaries, auth, connections, and
+   engineering standards are enforced by Cursor rules, Biome, and CI.
+2. Read `docs/adr/README.md`. Any change that contradicts an ADR requires a
+   new ADR superseding it.
 
 ## Local setup
 
@@ -14,23 +14,47 @@ nvm use                 # Node 22
 corepack enable         # activates pnpm@11.2.2
 pnpm install
 cp .env.example .env.local
-# fill in DATABASE_URL, ANTHROPIC_API_KEY, ARCADE_API_KEY
-pnpm db:push            # apply schema to local Postgres
+# Required: DATABASE_URL, ANTHROPIC_API_KEY, ARCADE_API_KEY, BETTER_AUTH_SECRET, BETTER_AUTH_URL
+# Optional dev: RESEND_API_KEY (magic links log to console if unset)
+pnpm db:push            # fresh local DB
+# OR for existing DBs that used db:push before migrations:
+#   pnpm db:baseline && pnpm db:migrate
 pnpm dev
 ```
+
+### Arcade OAuth (production multi-user)
+
+1. Arcade Dashboard → Auth → Settings → **Custom verifier**:
+   `${BETTER_AUTH_URL}/api/arcade/verify`
+2. Register your own OAuth apps per **provider family** in Arcade Dashboard
+   (Connected Apps → Add OAuth Provider). One Google app covers Gmail, Calendar,
+   Drive, etc. See **Settings → OAuth providers** in the app for the full catalog
+   and configured status.
+3. Provider setup guides: [Arcade auth providers](https://docs.arcade.dev/en/references/auth-providers)
+
+See ADR-0010.
 
 ## Quality gates
 
 ```bash
 pnpm typecheck          # strict TS — must pass
 pnpm check:ci           # Biome lint + format — must pass
+pnpm check:boundaries   # module import boundaries — must pass
 pnpm test:unit          # vitest — must pass
 pnpm test:eval          # mock-mode eval harness — must pass
+pnpm test:e2e           # Playwright (E2E_MOCK_ARCADE=1) — must pass in CI
 pnpm build              # Next.js production build — must pass
 ```
 
-All five run in CI on every push. Lefthook runs the first three on every
-commit, and the unit + mock eval tests on every push.
+All run in CI on every push. Lefthook runs typecheck + biome on commit, boundaries +
+unit + mock eval on push.
+
+Optional local integration:
+
+```bash
+pnpm test:arcade:live   # real Arcade SDK (opt-in env flags)
+pnpm test:eval:live     # repair vs real Claude
+```
 
 ## Commit style
 
@@ -38,20 +62,40 @@ Conventional Commits, enforced by commitlint:
 
 - `feat(aig): add UNCERTAIN state for low-confidence groupings`
 - `fix(repair): preserve human-edited args byte-for-byte`
-- `test(repair): add case-09 human mutation preservation fixture`
-- `docs(adr): add ADR-0005 co-authorship trace as hero`
+- `feat(connections): add workspace-scoped OAuth rows`
+- `docs(adr): add ADR-0010 custom verifier and connection scope`
 
-Allowed scopes: `aig`, `db`, `arcade`, `ai`, `ui`, `api`, `eval`, `adr`,
-`config`, `deps`, `ci`.
+Allowed scopes: `aig`, `db`, `arcade`, `ai`, `ui`, `api`, `auth`, `connections`,
+`eval`, `adr`, `config`, `deps`, `ci`.
 
 ## When to write an ADR
 
 Whenever you make a decision that:
 
 - Changes a stack invariant (versions in `AGENTS.md` §2).
-- Breaks a module boundary (`AGENTS.md` §3).
-- Reverses an existing ADR.
+- Breaks or extends a module boundary (`AGENTS.md` §3).
+- Reverses an existing ADR in `docs/adr/`.
 - Adds an item from the "intentionally not built" list in `AGENTS.md` §8.
+- Introduces a new cross-cutting pattern (caching, auth, tenancy) others must follow.
 
-ADRs live in `docs/adr/NNNN-kebab-title.md` and use the structure of the
-existing ones.
+ADRs live in `docs/adr/NNNN-kebab-title.md`. Update `docs/adr/README.md`.
+
+## Cursor rules map
+
+| Rule | Scope |
+| ---- | ----- |
+| `00-architecture.mdc` | Module boundaries (always on) |
+| `45-engineering-standards.mdc` | Quality, performance, testing (always on) |
+| `scripts/check-boundaries.ts` | Machine-enforced import boundaries (CI) |
+| `10-state-machine.mdc` | `lib/aig/state.ts` |
+| `20-repair.mdc` | Repair engine + eval |
+| `30-arcade.mdc` | Arcade SDK, connections, executor |
+| `40-auth-tenancy.mdc` | Better Auth + workspaces |
+
+## License of contributions
+
+This project is source-available under [`FSL-1.1-MIT`](LICENSE.md). By
+submitting a pull request you agree that your contribution is licensed under
+the same terms — including the two-year MIT future grant. If you cannot agree
+to this (for example because your employer asserts ownership of your work),
+please do not submit the contribution.

@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { executeApprovedIntent } from '@/lib/aig/executor'
 import { jsonError, jsonOk, messageFromUnknown, parseJson } from '@/lib/api/http'
+import { requireSession, resolveWorkspaceContext } from '@/lib/auth/session'
 import { appendMutation, getIntentWithTrace, markIntentApproved } from '@/lib/db/queries'
+import { isE2eAuthSkipped } from '@/lib/env'
 import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +14,6 @@ interface RouteContext {
 }
 
 const approveSchema = z.object({
-  approvedBy: z.string().email(),
   execute: z.boolean().default(false),
 })
 
@@ -21,7 +22,21 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const body = parseJson(approveSchema, await request.json())
-    const approved = await markIntentApproved(id, body.approvedBy)
+
+    let approvedBy: string
+    let approvedByUserId: string | null
+
+    if (isE2eAuthSkipped) {
+      const ctx = await resolveWorkspaceContext()
+      approvedBy = ctx.email || 'e2e-operator'
+      approvedByUserId = null
+    } else {
+      const session = await requireSession()
+      approvedBy = session.user.email
+      approvedByUserId = session.user.id
+    }
+
+    const approved = await markIntentApproved(id, approvedBy, approvedByUserId)
     if (!approved) return jsonError('Intent not found', 404)
 
     await appendMutation({
@@ -29,7 +44,8 @@ export async function POST(request: Request, context: RouteContext) {
       type: 'human_approved',
       actor: 'human',
       payload: {
-        approvedBy: body.approvedBy,
+        approvedBy,
+        approvedByUserId,
         execute: body.execute,
       },
     })
@@ -37,7 +53,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (body.execute) {
       const result = await executeApprovedIntent({
         intentId: id,
-        arcadeUserId: body.approvedBy,
+        approvedByUserId: approvedByUserId ?? 'e2e-anonymous',
       })
       return jsonOk({ ...(await getIntentWithTrace(id)), execution: result })
     }

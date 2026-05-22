@@ -6,9 +6,12 @@
  * HALT_REMAINING (ADR-0004).
  */
 
+import { validateConnectionForExecution } from '@/lib/aig/connection-auth'
 import { topologicalSort } from '@/lib/aig/state'
 import { AIGBlockedAuthError } from '@/lib/aig/types'
+import { toolkitFromToolName } from '@/lib/arcade/identity'
 import { executeArcadeTool } from '@/lib/arcade/tools'
+import { isWorkspaceMember, resolveConnectionForTool } from '@/lib/db/connection-queries'
 import {
   appendMutation,
   getIntentWithTrace,
@@ -19,11 +22,12 @@ import {
   setToolCallStatus,
 } from '@/lib/db/queries'
 import type { ToolCall } from '@/lib/db/schema'
+import { isArcadeMocked } from '@/lib/env'
 import { logger } from '@/lib/logger'
 
 export interface ExecuteIntentInput {
   intentId: string
-  arcadeUserId: string
+  approvedByUserId: string
 }
 
 export interface ExecuteIntentResult {
@@ -51,15 +55,35 @@ function callById(calls: ToolCall[]): Map<string, ToolCall> {
   return new Map(calls.map((call) => [call.id, call]))
 }
 
+async function assertConnectionAuthorized(input: {
+  connection: Awaited<ReturnType<typeof resolveConnectionForTool>>
+  approverUserId: string
+  workspaceId: string
+  toolkitName: string
+}) {
+  const isMember = await isWorkspaceMember({
+    workspaceId: input.workspaceId,
+    userId: input.approverUserId,
+  })
+
+  return validateConnectionForExecution({
+    connection: input.connection,
+    approverUserId: input.approverUserId,
+    isWorkspaceMember: isMember,
+    toolkitName: input.toolkitName,
+  })
+}
+
 export async function executeApprovedIntent({
   intentId,
-  arcadeUserId,
+  approvedByUserId,
 }: ExecuteIntentInput): Promise<ExecuteIntentResult> {
   const snapshot = await getIntentWithTrace(intentId)
   if (!snapshot) throw new Error('Intent not found')
 
-  if (snapshot.intent.approvedBy !== arcadeUserId) {
-    throw new AIGBlockedAuthError(snapshot.intent.approvedBy ?? 'unknown', arcadeUserId)
+  const approverId = snapshot.intent.approvedByUserId ?? approvedByUserId
+  if (!isArcadeMocked && approverId !== approvedByUserId) {
+    throw new AIGBlockedAuthError(snapshot.intent.approvedBy ?? approverId, approvedByUserId)
   }
 
   await setIntentStatus(intentId, 'EXECUTING')
@@ -78,10 +102,39 @@ export async function executeApprovedIntent({
     const call = calls.get(id)
     if (!call) continue
 
+    const toolkitName = toolkitFromToolName(call.tool)
+
+    let arcadeUserId: string
+    if (isArcadeMocked) {
+      arcadeUserId = `e2e:${approvedByUserId}`
+    } else {
+      const connection = await resolveConnectionForTool({
+        workspaceId: snapshot.intent.workspaceId,
+        approverUserId: approvedByUserId,
+        toolkitName,
+      })
+      const authorized = await assertConnectionAuthorized({
+        connection,
+        approverUserId: approvedByUserId,
+        workspaceId: snapshot.intent.workspaceId,
+        toolkitName,
+      })
+      arcadeUserId = authorized.arcadeUserId
+    }
+
     await setToolCallStatus(call.id, 'executing')
 
     try {
-      logger.info({ intentId, toolCallId: call.id, tool: call.tool }, 'executing arcade tool')
+      logger.info(
+        {
+          intentId,
+          toolCallId: call.id,
+          tool: call.tool,
+          arcadeUserId,
+          mocked: isArcadeMocked,
+        },
+        'executing arcade tool',
+      )
       const result = await executeArcadeTool({
         tool: call.tool,
         args: asRecord(call.argSnapshot ?? call.args),
@@ -125,6 +178,8 @@ export async function executeApprovedIntent({
       })
       executed.push(call.id)
     } catch (error) {
+      if (error instanceof AIGBlockedAuthError) throw error
+
       const message = error instanceof Error ? error.message : 'Unknown execution error'
       await markToolCallFailed(call.id, message)
       await recordExecution({

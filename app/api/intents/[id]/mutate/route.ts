@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { buildE2eRepairResponse } from '@/lib/aig/e2e-repair'
 import { repairIntent } from '@/lib/aig/repair'
 import { computeInvalidatedIds } from '@/lib/aig/state'
 import type { RepairInput, RepairNode } from '@/lib/aig/types'
@@ -12,6 +13,7 @@ import {
   setIntentStatus,
 } from '@/lib/db/queries'
 import type { Mutation, ToolCall } from '@/lib/db/schema'
+import { isArcadeMocked } from '@/lib/env'
 import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -120,7 +122,10 @@ async function regenerate(input: { intentId: string; seedIds: Set<string>; reaso
     ...(input.reason ? { humanReason: input.reason } : {}),
   }
 
-  const response = await repairIntent(repairInput)
+  const response = await repairIntent(
+    repairInput,
+    isArcadeMocked ? { mockResponse: buildE2eRepairResponse(repairInput) } : {},
+  )
   const inserted = await insertReplacementToolCalls(input.intentId, response.replace)
 
   await appendMutation({

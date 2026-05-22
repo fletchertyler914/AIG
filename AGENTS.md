@@ -2,8 +2,8 @@
 
 This file is the single source of truth for any AI coding agent (Cursor, Claude
 Code, Codex, etc.) contributing to this repository. Read this **before** making
-changes. Cursor rules in `.cursor/rules/` enforce a subset of these as inline
-guardrails.
+changes. Cursor rules in `.cursor/rules/` enforce a subset as inline guardrails
+(see `CONTRIBUTING.md` for the rule map).
 
 If a guideline here conflicts with general training, **this file wins**.
 
@@ -47,6 +47,8 @@ in `docs/adr/` is forbidden.
 | E2E          | @playwright/test              | ^1.60     |
 | Git hooks    | lefthook                      | ^2.1      |
 | Logging      | pino                          | ^10       |
+| Auth         | better-auth                   | ^1.6      |
+| Email        | resend + react-email          | ^6        |
 
 ---
 
@@ -55,30 +57,54 @@ in `docs/adr/` is forbidden.
 ```
 app/                    HTTP + UI layer. Only place that constructs Response objects.
   └── api/              Route handlers. Validate input with zod, return typed JSON.
-  └── (dashboard)/      RSC pages. 'use client' only where strictly required.
+  └── app/              Authenticated control plane (RSC + client islands).
 components/             UI primitives + composed components. No data fetching.
   └── ui/               shadcn primitives — never edited manually except theming.
 lib/aig/                PURE DOMAIN. No fetch, no fs, no env, no DB, no Arcade.
   ├── state.ts          Intent lifecycle state machine.
   ├── formation.ts      Window + DAG construction.
   ├── repair.ts         Constrained regeneration. Takes/returns plain data.
-  ├── executor.ts       Execution ordering. Takes/returns plain data.
+  ├── executor.ts       Execution ordering (orchestrates via injected wrappers).
+  ├── connection-auth.ts  Pure connection-scope validation for execution.
+  ├── expire.ts         TTL / expiry rules.
   └── prompts/          System prompts as .md files.
-lib/db/                 ONLY place that imports `drizzle-orm`.
-  ├── schema.ts
-  ├── client.ts
-  ├── queries.ts
-  └── migrations/
 lib/arcade/             ONLY place that imports `@arcadeai/arcadejs`.
-  └── client.ts
+  ├── client.ts         Singleton SDK client.
+  ├── identity.ts       Stable Arcade user_id chokepoint (ADR-0010).
+  ├── verifier.ts       auth.confirmUser wrapper.
+  ├── authorize.ts      tools.authorize + pending flow binding.
+  ├── catalog.ts        Curated + full toolkit index (SDK pagination + cache).
+  ├── tools.ts            execute + formatted list wrappers.
+  └── mock.ts             E2E mock (type-compatible with real client).
+lib/display/            Presentation helpers with no I/O (safe for components).
+  ├── toolkits.ts       Human-readable toolkit + tool labels.
+  └── args-form.ts      Flat arg → labeled form field inference.
+lib/intent/             Intent lifecycle orchestration (DB + Arcade I/O).
+  └── authorization-sync.ts  Re-check OAuth; SSE fingerprint for live UI.
+lib/auth/               ONLY place that imports `better-auth`.
+  ├── server.ts         Better Auth config + Drizzle adapter.
+  ├── client.ts         Browser auth client.
+  ├── session.ts        resolveWorkspaceContext() for API routes.
+  └── provision.ts      Org + workspace bootstrap on sign-in.
+lib/db/                 ONLY place that imports `drizzle-orm`.
+  ├── schema.ts         Domain tables (intents, connections, workspaces, …).
+  ├── auth-schema.ts    Better Auth tables (generated — run pnpm auth:generate).
+  ├── client.ts
+  ├── queries.ts        Intent graph queries.
+  ├── connection-queries.ts  Toolkit connections + resolveConnectionForTool().
+  ├── workspace-queries.ts
+  └── migrations/
 lib/ai/                 ONLY place that imports `ai` or `@ai-sdk/*`.
   ├── anthropic.ts
-  └── plan-agent.ts
+  ├── plan-agent.ts
+  └── labeler.ts
+lib/api/                Shared HTTP helpers (jsonOk, parseJson, …).
 lib/env.ts              ONLY place that reads process.env.
 lib/logger.ts           ONLY place that imports `pino`.
 eval/                   Repair eval harness. Imports lib/aig/* and mocks the rest.
-tests/                  unit/ uses vitest. e2e/ uses playwright.
+tests/                  unit/ (vitest), integration/, e2e/ (playwright).
 scripts/                One-off ops scripts. Run with `tsx`.
+docs/adr/               Architecture decision records — read before big changes.
 ```
 
 **Forbidden cross-imports** (enforced by `.cursor/rules/00-architecture.mdc`):
@@ -88,6 +114,57 @@ scripts/                One-off ops scripts. Run with `tsx`.
 - `app/*` and `components/*` may not import `lib/db/*` or `lib/arcade/*`
   directly. Go through an API route or a server action.
 - Nothing outside `lib/env.ts` reads `process.env`.
+
+---
+
+## 3a. Arcade integration preference
+
+Always prefer **Arcade SDK → REST API → MCP** over hand-rolled alternatives:
+
+| Do | Don't |
+| ---- | ----- |
+| `client.tools.list()` via `lib/arcade/client.ts` | Raw `fetch` to `api.arcade.dev/v1/...` |
+| `client.tools.formatted.list()` for model schemas | Hand-wrap tool JSON schemas |
+| `client.auth.confirmUser()` / `tools.authorize()` | Custom OAuth or auth HTTP |
+| Official MCP tools when building MCP surfaces | Reimplement the same calls ad hoc |
+| Paginate SDK list APIs when no toolkit endpoint exists | Scrape docs.arcade.dev or maintain a forked catalog |
+
+Application caching, deduplication, and UI-side filtering in `lib/arcade/` are
+acceptable. Reimplementing Arcade's wire protocol is not.
+
+---
+
+## 3b. Auth & tenancy
+
+AIG is a multi-tenant control plane (ADR-0009):
+
+- **Sign-in** — Better Auth magic link (`lib/auth/`). Resend in production.
+- **Tenancy** — Better Auth organizations + AIG `workspaces` (`production` |
+  `sandbox`).
+- **API context** — Every authenticated route calls `resolveWorkspaceContext()`.
+- **Arcade identity** — Separate from AIG sign-in; see ADR-0010 and
+  `lib/arcade/identity.ts`.
+
+Cursor rule: `.cursor/rules/40-auth-tenancy.mdc`.
+
+---
+
+## 3c. Connections & toolkit scope
+
+Toolkit OAuth is stored in `toolkit_connections` with scope `personal` or
+`shared` (ADR-0010):
+
+| Scope | Arcade `user_id` | Who manages |
+| ----- | ---------------- | ----------- |
+| personal | `user:{userId}` | The signed-in user |
+| shared | `workspace:{workspaceId}` | Org owner/admin only |
+
+At execution, `resolveConnectionForTool()` picks personal → shared → blocked.
+Pure validation lives in `lib/aig/connection-auth.ts`.
+
+Connections UI/API: `app/api/connections/`, `components/connections/`.
+Catalog: curated default + full-index search via SDK `tools.list` pagination
+(`lib/arcade/catalog.ts`).
 
 ---
 
@@ -124,12 +201,14 @@ Pre-commit (automated by lefthook):
 - `tsc --noEmit` (incremental)
 
 Pre-push (automated by lefthook):
+- `pnpm check:boundaries` (module import rules)
 - `vitest run tests/unit`
 - `EVAL_MODE=mock vitest run eval`
 
 CI (required to merge):
 - `pnpm typecheck`
 - `pnpm check:ci`
+- `pnpm check:boundaries`
 - `pnpm test:unit`
 - `EVAL_MODE=mock pnpm test:eval`
 - `pnpm test:e2e` (with `E2E_MOCK_ARCADE=1`)
@@ -157,7 +236,57 @@ Examples:
 - Semantic causality metadata on DAG edges
 - Cross-window intent merging
 - Multi-agent / multi-session concurrency handling
-- RBAC / role policies
+- Fine-grained RBAC / per-tool policies (org owner/admin gates **shared**
+  connections only — see ADR-0010; not full enterprise RBAC)
 - Compensating-transaction rollback (designed in ADR-0004, not built in MVP)
 
 Do not add these without an ADR + design discussion.
+
+---
+
+## 9. Engineering standards
+
+These qualities are explicit project goals. Cursor enforces a subset via
+`.cursor/rules/45-engineering-standards.mdc`.
+
+### Modularity
+
+- **Pure core** — Business rules in `lib/aig/*` with zero I/O. If it needs DB,
+  Arcade, or env, it belongs in `lib/db/*`, `lib/arcade/*`, or the route layer.
+- **Chokepoints** — One module per cross-cutting concern (identity, state
+  transitions, workspace context). Extend the chokepoint; don't fork logic.
+- **Thin HTTP layer** — Routes validate, authorize, delegate, serialize. No
+  business logic in route files beyond orchestration.
+
+### Performance & scalability
+
+- Bound external calls (pagination, curated subsets, explicit limits).
+- Cache expensive SDK scans with TTL + inflight deduplication
+  (`lib/arcade/catalog.ts` is the reference pattern).
+- Avoid N+1 queries; batch reads in list endpoints.
+- Prefer RSC + streaming; `'use client'` only for interactivity.
+- Long-running work: `maxDuration`, background refresh, or explicit user action —
+  never block first paint on a full Arcade catalog scan.
+
+### Maintainability
+
+- **ADRs** for architectural decisions (`docs/adr/README.md`).
+- **Append-only audit** — never mutate historical mutations or co-authorship rows.
+- **Conventional commits** with scoped messages (see §7).
+- Comments explain *why* and link to ADRs/discussions — not *what* the code does.
+
+### Quality gates
+
+Same as §6 — no merging without green CI. **`pnpm check:boundaries`** enforces
+import rules from §3 (Arcade SDK chokepoint, UI layer isolation, pure `lib/aig/*`).
+Repair eval live gate (9/9 × 3 runs) before shipping repair prompt changes.
+
+### Security
+
+- Secrets and env parsing only in `lib/env.ts`.
+- Structured logging with redaction in `lib/logger.ts`.
+- Zod validation on every mutating API boundary.
+- Arcade OAuth isolated from AIG sign-in; custom verifier required for production
+  multi-user (ADR-0010).
+
+---

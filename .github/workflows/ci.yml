@@ -42,6 +42,9 @@ jobs:
       - name: Biome
         run: pnpm check:ci
 
+      - name: Module boundaries
+        run: pnpm check:boundaries
+
       - name: Unit tests
         run: pnpm test:unit
 

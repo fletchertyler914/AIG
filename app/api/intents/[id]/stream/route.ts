@@ -1,4 +1,9 @@
+import { expireIfNeeded } from '@/lib/aig/expire'
 import { getIntentWithTrace } from '@/lib/db/queries'
+import {
+  intentSnapshotFingerprint,
+  syncAuthorizationIfNeeded,
+} from '@/lib/intent/authorization-sync'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -11,16 +16,28 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+async function loadSnapshot(intentId: string) {
+  await syncAuthorizationIfNeeded(intentId)
+  let snapshot = await getIntentWithTrace(intentId)
+  if (!snapshot) return null
+
+  const newStatus = await expireIfNeeded(snapshot.intent)
+  if (newStatus !== snapshot.intent.status) {
+    snapshot = await getIntentWithTrace(intentId)
+  }
+  return snapshot
+}
+
 export async function GET(request: Request, context: RouteContext) {
   const { id } = await context.params
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
     async start(controller) {
-      let lastMutationCount = -1
+      let lastFingerprint = ''
 
       while (!request.signal.aborted) {
-        const snapshot = await getIntentWithTrace(id)
+        const snapshot = await loadSnapshot(id)
         if (!snapshot) {
           controller.enqueue(
             encoder.encode('event: error\\ndata: {"error":"Intent not found"}\\n\\n'),
@@ -28,8 +45,9 @@ export async function GET(request: Request, context: RouteContext) {
           break
         }
 
-        if (snapshot.mutations.length !== lastMutationCount) {
-          lastMutationCount = snapshot.mutations.length
+        const fingerprint = intentSnapshotFingerprint(snapshot)
+        if (fingerprint !== lastFingerprint) {
+          lastFingerprint = fingerprint
           controller.enqueue(
             encoder.encode(`event: intent\\ndata: ${JSON.stringify(snapshot)}\\n\\n`),
           )

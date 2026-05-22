@@ -1,0 +1,52 @@
+---
+description: Code quality, performance, and maintainability standards
+alwaysApply: true
+---
+
+# Engineering Standards
+
+Read `AGENTS.md` §9 for rationale. These rules apply to every change.
+
+## Change discipline
+
+- **Minimal diff.** Solve the stated problem; do not refactor adjacent code,
+  rename for style, or add speculative abstractions.
+- **One concern per PR/commit.** Mixed refactors + features are hard to review
+  and revert.
+- **Match existing patterns** in the file you touch before introducing new ones.
+
+## Performance & scalability
+
+- **External I/O must be bounded.** Arcade/LLM/DB list calls need explicit
+  limits, pagination, or curated subsets. Never unbounded full-table scans in
+  request paths without cache + TTL.
+- **Cache with intent.** Follow `lib/arcade/catalog.ts`: TTL, per-key cache,
+  inflight deduplication. Document why the cache exists and when it invalidates.
+- **Route timeouts.** Long Arcade catalog builds belong behind `maxDuration`,
+  background warm, or explicit user-triggered refresh — not blocking first paint.
+- **No N+1.** Batch DB reads in list endpoints; prefer joins or `inArray`.
+- **Pure hot paths.** Keep `lib/aig/*` free of I/O so state/repair/executor logic
+  stays unit-testable without mocks.
+
+## Maintainability & modularity
+
+- **Single chokepoints** for cross-cutting identity and policy:
+  `lib/arcade/identity.ts`, `lib/aig/state.ts` (`assertTransition`),
+  `lib/auth/session.ts` (`resolveWorkspaceContext`).
+- **Zod at HTTP boundaries** only. Domain functions receive validated plain data.
+- **Append-only audit data** (`mutations`, co-authorship trace) — never UPDATE/DELETE.
+- **ADR before architecture shifts** — stack pins, module boundaries, new product
+  surfaces from `AGENTS.md` §8.
+
+## Testing
+
+- State machine transitions → `tests/unit/state.test.ts`.
+- New pure domain behavior → unit test with fixtures, not live APIs.
+- Repair changes → eval fixture or extend `eval/fixtures/`.
+- UI flows → Playwright only when unit tests cannot cover the behavior.
+
+## Security
+
+- Secrets only in `lib/env.ts`. Log redaction via `lib/logger.ts`.
+- Never pass raw email as Arcade `user_id` (see ADR-0010).
+- Shared toolkit OAuth gated by `canManageSharedConnections()`.

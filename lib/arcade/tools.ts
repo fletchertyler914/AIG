@@ -1,4 +1,5 @@
 import type { ExecuteToolResponse } from '@arcadeai/arcadejs/resources/tools'
+import { isArcadeMocked } from '@/lib/env'
 import { getArcadeClient } from './client'
 
 export interface ParsedArcadeToolName {
@@ -22,7 +23,7 @@ export function parseArcadeToolName(tool: string): ParsedArcadeToolName {
  * accounts. Never enabled in production.
  */
 function isMocked(): boolean {
-  return process.env['E2E_MOCK_ARCADE'] === '1'
+  return isArcadeMocked
 }
 
 function mockedExecution(input: {

@@ -5,6 +5,9 @@ import { formCandidateIntent, statusForConfidence } from '@/lib/aig/formation'
 import type { IntentStatus } from '@/lib/aig/types'
 import { jsonError, jsonOk, messageFromUnknown, parseJson } from '@/lib/api/http'
 import { authorizeMany, hasPendingAuthorizations } from '@/lib/arcade/authorize'
+import { personalArcadeIdentity } from '@/lib/arcade/identity'
+import { resolveWorkspaceContext } from '@/lib/auth/session'
+import { listEnabledToolkitNames } from '@/lib/db/connection-queries'
 import { type CreateIntentInput, createIntent, listRecentIntents } from '@/lib/db/queries'
 import { env } from '@/lib/env'
 import { logger } from '@/lib/logger'
@@ -21,7 +24,6 @@ const PLAN_TIMEOUT_MS = 50_000
 
 const createIntentSchema = z.object({
   prompt: z.string().min(1).max(2000),
-  userId: z.string().email().optional(),
   /** Toolkits the plan agent may consider. Default mirrors the operator's
    *  Arcade authorizations for the demo scenario. */
   toolkits: z.array(z.string().min(1)).min(1).optional(),
@@ -30,8 +32,21 @@ const createIntentSchema = z.object({
 
 const DEFAULT_TOOLKITS = ['Gmail', 'GoogleCalendar'] as const
 
+async function selectToolkits(input: {
+  explicit?: string[]
+  workspaceId: string
+}): Promise<string[]> {
+  if (input.explicit && input.explicit.length > 0) return input.explicit
+
+  const enabled = await listEnabledToolkitNames(input.workspaceId)
+  if (enabled.length > 0) return enabled
+
+  return Array.from(DEFAULT_TOOLKITS)
+}
+
 export async function GET() {
-  const intents = await listRecentIntents()
+  const ctx = await resolveWorkspaceContext()
+  const intents = await listRecentIntents({ workspaceId: ctx.workspace.id })
   return jsonOk({ intents })
 }
 
@@ -42,14 +57,22 @@ export async function POST(request: Request) {
 
   try {
     const body = parseJson(createIntentSchema, await request.json())
-    const userId = body.userId ?? env.DEMO_USER_ID
-    const toolkits = body.toolkits ?? [...DEFAULT_TOOLKITS]
+    const ctx = await resolveWorkspaceContext()
+    const arcadeIdentity = personalArcadeIdentity(ctx.userId === 'anonymous' ? 'demo' : ctx.userId)
+    const planUserId = ctx.email || env.DEMO_USER_ID
+    const toolkits = await selectToolkits({
+      ...(body.toolkits ? { explicit: body.toolkits } : {}),
+      workspaceId: ctx.workspace.id,
+    })
 
-    log.info({ userId, toolkits, promptChars: body.prompt.length }, 'plan agent invoked')
+    log.info(
+      { userId: ctx.userId, toolkits, promptChars: body.prompt.length },
+      'plan agent invoked',
+    )
 
     const plan = await runPlanAgent({
       prompt: body.prompt,
-      userId,
+      userId: planUserId,
       toolkits,
       signal: ac.signal,
       ...(body.maxSteps !== undefined ? { maxSteps: body.maxSteps } : {}),
@@ -67,7 +90,7 @@ export async function POST(request: Request) {
 
     const authorizations = await authorizeMany(
       candidate.toolCalls.map((c) => c.tool),
-      userId,
+      arcadeIdentity,
     )
 
     const initialStatus: IntentStatus = hasPendingAuthorizations(authorizations)
@@ -77,6 +100,8 @@ export async function POST(request: Request) {
     const pendingAuths = authorizations.filter((a) => a.status !== 'completed')
 
     const input: CreateIntentInput = {
+      workspaceId: ctx.workspace.id,
+      createdByUserId: ctx.userId === 'anonymous' ? null : ctx.userId,
       label: candidate.label,
       description: candidate.description,
       objective: candidate.objective,

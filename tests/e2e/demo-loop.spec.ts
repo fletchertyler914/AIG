@@ -4,7 +4,7 @@
  * Path:
  *   1. Click "or replay the locked demo" on the dashboard
  *   2. Detail page loads with PENDING_REVIEW + locked objective + tool calls
- *   3. Click "Remove" on a GoogleCalendar.CreateEvent card
+ *   3. Select a GoogleCalendar node and click "Remove" in the side panel
  *   4. Trace shows: agent_proposed → human_removed → system_invalidated → agent_regenerated
  *   5. Click "Approve intent" (triggers Arcade execution — mocked here)
  *   6. Trace adds: human_approved → arcade_executed × N → status = COMPLETE
@@ -20,7 +20,7 @@ test.describe('AIG demo loop', () => {
   test('create → mutate → repair → approve → execute', async ({ page }) => {
     test.setTimeout(60_000)
 
-    await page.goto('/')
+    await page.goto('/app')
 
     await page.getByTestId('run-demo').click()
     await page.waitForURL(/\/intent\/.+/)
@@ -31,17 +31,25 @@ test.describe('AIG demo loop', () => {
     await expect(page.getByTestId('intent-status')).toHaveText('PENDING_REVIEW')
     await expect(page.getByText('Locked objective:')).toBeVisible()
 
+    await page.getByTestId('view-list').click()
+
     const calendarCards = page.locator('[data-testid="tool-call-card"][data-tool*="Calendar"]')
     const cardsCount = await calendarCards.count()
     expect(cardsCount).toBeGreaterThan(0)
 
-    const targetCard = calendarCards.first()
-    await targetCard.getByTestId('tool-call-remove').click()
+    await calendarCards.first().click()
+    await expect(page.getByTestId('tool-call-remove')).toBeVisible()
 
-    await expect(page.getByTestId('trace-entry')).toHaveCount(4, { timeout: 15_000 })
+    const mutateResponse = page.waitForResponse((response) => response.url().includes('/mutate'))
+    await page.getByTestId('tool-call-remove').click()
+    const mutate = await mutateResponse
+    expect(mutate.ok()).toBeTruthy()
+
+    await page.getByRole('button', { name: 'Expand trace' }).click()
+
     await expect(
       page.locator('[data-testid="trace-entry"][data-event-type="human_removed"]'),
-    ).toBeVisible()
+    ).toBeVisible({ timeout: 15_000 })
     await expect(
       page.locator('[data-testid="trace-entry"][data-event-type="system_invalidated"]'),
     ).toBeVisible()
@@ -53,7 +61,12 @@ test.describe('AIG demo loop', () => {
       timeout: 15_000,
     })
 
+    const approveResponse = page.waitForResponse((response) => response.url().includes('/approve'))
     await page.getByTestId('approve-button').click()
+    const approve = await approveResponse
+    if (!approve.ok()) {
+      throw new Error(`Approve failed: ${approve.status()} ${await approve.text()}`)
+    }
 
     await expect(page.getByTestId('intent-status')).toHaveText('COMPLETE', { timeout: 30_000 })
     await expect(

@@ -7,7 +7,10 @@
  * the intent leaves UNCERTAIN.
  */
 
+import { isArcadeMocked } from '@/lib/env'
 import { getArcadeClient } from './client'
+import type { ArcadeIdentity } from './identity'
+import { parseFlowIdFromAuthUrl, toArcadeUserId } from './identity'
 import { parseArcadeToolName } from './tools'
 
 export interface ToolAuthorizationStatus {
@@ -21,21 +24,30 @@ export interface ToolAuthorizationStatus {
   providerId?: string
 }
 
+export interface ToolkitAuthorizationStatus {
+  toolkitName: string
+  representativeTool: string
+  status: ToolAuthorizationStatus['status']
+  url?: string
+  providerId?: string
+  pendingFlowId?: string | null
+}
+
 export interface AuthorizeManyOptions {
   /** Inject for tests. */
-  authorizer?: (input: { tool: string; userId: string }) => Promise<ToolAuthorizationStatus>
+  authorizer?: (input: {
+    tool: string
+    identity: ArcadeIdentity
+  }) => Promise<ToolAuthorizationStatus>
 }
 
 /**
  * Returns the union of unique tools (deduped by `tool_name`, version
  * stripped) along with their current authorization status.
- *
- * The list ordering matches first appearance in the input array so the
- * UI can render predictably.
  */
 export async function authorizeMany(
   tools: ReadonlyArray<string>,
-  userId: string,
+  identity: ArcadeIdentity,
   options: AuthorizeManyOptions = {},
 ): Promise<ToolAuthorizationStatus[]> {
   const seen = new Set<string>()
@@ -46,16 +58,50 @@ export async function authorizeMany(
     ordered.push(t)
   }
   const authorizer = options.authorizer ?? defaultAuthorizer
-  return Promise.all(ordered.map((tool) => authorizer({ tool, userId })))
+  return Promise.all(ordered.map((tool) => authorizer({ tool, identity })))
+}
+
+export async function authorizeToolkit(input: {
+  toolkitName: string
+  representativeTool: string
+  identity: ArcadeIdentity
+  nextUri?: string
+}): Promise<ToolkitAuthorizationStatus> {
+  if (isMocked()) {
+    return {
+      toolkitName: input.toolkitName,
+      representativeTool: input.representativeTool,
+      status: 'completed',
+    }
+  }
+
+  const arcade = getArcadeClient()
+  const { toolName, toolVersion } = parseArcadeToolName(input.representativeTool)
+  const res = await arcade.tools.authorize({
+    tool_name: toolName,
+    user_id: toArcadeUserId(input.identity),
+    ...(toolVersion ? { tool_version: toolVersion } : {}),
+    ...(input.nextUri ? { next_uri: input.nextUri } : {}),
+  })
+
+  const out: ToolkitAuthorizationStatus = {
+    toolkitName: input.toolkitName,
+    representativeTool: input.representativeTool,
+    status: normalizeStatus(res.status),
+  }
+  if (res.url) out.url = res.url
+  if (res.provider_id) out.providerId = res.provider_id
+  if (res.url) out.pendingFlowId = parseFlowIdFromAuthUrl(res.url)
+  return out
 }
 
 function isMocked(): boolean {
-  return process.env['E2E_MOCK_ARCADE'] === '1'
+  return isArcadeMocked
 }
 
 async function defaultAuthorizer(input: {
   tool: string
-  userId: string
+  identity: ArcadeIdentity
 }): Promise<ToolAuthorizationStatus> {
   if (isMocked()) {
     return { tool: input.tool, status: 'completed' }
@@ -65,7 +111,7 @@ async function defaultAuthorizer(input: {
   const { toolName, toolVersion } = parseArcadeToolName(input.tool)
   const res = await arcade.tools.authorize({
     tool_name: toolName,
-    user_id: input.userId,
+    user_id: toArcadeUserId(input.identity),
     ...(toolVersion ? { tool_version: toolVersion } : {}),
   })
 
