@@ -26,7 +26,7 @@ autonomy as a first-class, replayable artifact.
   is a secondary tab. Execution logs are tertiary and collapsed by default.
 - Every mutation row reads as a narrative line:
   > 09:42 — Human removed `Calendar.CreateEvent` ("don't auto-schedule")
-  > 09:43 — Agent regenerated downstream `Slack.SendMessage`
+  > 09:43 — Agent regenerated downstream summary action
   > 09:44 — Human edited `Gmail.SendEmail.body` (Acme thread)
 - The 90-second demo video is shot to make this timeline the centerpiece.
 

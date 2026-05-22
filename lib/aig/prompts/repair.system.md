@@ -30,7 +30,7 @@ graph of MCP tool calls after a human has constrained execution.
 ```json
 {
   "replace": [
-    { "tool": "Slack.SendMessageToChannel", "args": { ... }, "dependsOn": ["<id>"] }
+    { "tool": "Gmail.SendEmail@7.0.0", "args": { ... }, "dependsOn": ["<id>"] }
   ],
   "preserve": ["<tool-call-id>", ...],
   "remove": ["<tool-call-id>", ...]
@@ -45,7 +45,7 @@ graph of MCP tool calls after a human has constrained execution.
 
 ## Repair rules
 
-- If removing a node leaves downstream work incoherent (e.g. a Slack message
+- If removing a node leaves downstream work incoherent (e.g. an internal summary
   that referenced a deleted calendar event), rewrite ONLY the downstream nodes
   in `replace` so they remain consistent with preserved/locked nodes.
 - If all remaining nodes are locked and there is nothing to repair, return

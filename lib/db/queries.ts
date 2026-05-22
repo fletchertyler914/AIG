@@ -13,6 +13,7 @@ import type {
   IntentStatus,
   MutationActor,
   MutationType,
+  NewRepairNode,
   RollbackPolicy,
   ToolCallStatus,
 } from '@/lib/aig/types'
@@ -58,6 +59,14 @@ export async function getIntentWithTrace(intentId: string): Promise<IntentWithTr
 
 export async function listRecentIntents(limit = 25): Promise<Intent[]> {
   return db.select().from(intents).orderBy(sql`${intents.createdAt} desc`).limit(limit)
+}
+
+export async function getToolCallsForIntent(intentId: string): Promise<ToolCall[]> {
+  return db
+    .select()
+    .from(toolCalls)
+    .where(eq(toolCalls.intentId, intentId))
+    .orderBy(asc(toolCalls.position), asc(toolCalls.createdAt))
 }
 
 // ── Creation ─────────────────────────────────────────────────────────────────
@@ -306,6 +315,58 @@ export async function setToolCallStatus(
     .where(eq(toolCalls.id, toolCallId))
     .returning()
   return row ?? null
+}
+
+export async function markToolCallExecuted(
+  toolCallId: string,
+  result: Record<string, unknown>,
+): Promise<ToolCall | null> {
+  const [row] = await db
+    .update(toolCalls)
+    .set({ status: 'done', execResult: result, execError: null })
+    .where(eq(toolCalls.id, toolCallId))
+    .returning()
+  return row ?? null
+}
+
+export async function markToolCallFailed(
+  toolCallId: string,
+  error: string,
+): Promise<ToolCall | null> {
+  const [row] = await db
+    .update(toolCalls)
+    .set({ status: 'failed', execError: error })
+    .where(eq(toolCalls.id, toolCallId))
+    .returning()
+  return row ?? null
+}
+
+export async function insertReplacementToolCalls(
+  intentId: string,
+  replacements: NewRepairNode[],
+): Promise<ToolCall[]> {
+  if (replacements.length === 0) return []
+
+  return db.transaction(async (tx) => {
+    const [{ nextPosition } = { nextPosition: 0 }] = await tx
+      .select({
+        nextPosition: sql<number>`coalesce(max(${toolCalls.position}), -1) + 1`,
+      })
+      .from(toolCalls)
+      .where(eq(toolCalls.intentId, intentId))
+
+    const rows = replacements.map((replacement, index) => ({
+      id: ulid(),
+      intentId,
+      tool: replacement.tool,
+      args: replacement.args,
+      dependsOn: replacement.dependsOn,
+      position: nextPosition + index,
+      rollbackPolicy: 'HALT_REMAINING' as const,
+    }))
+
+    return tx.insert(toolCalls).values(rows).returning()
+  })
 }
 
 // ── Execution records ────────────────────────────────────────────────────────

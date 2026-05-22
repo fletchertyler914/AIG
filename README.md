@@ -26,11 +26,11 @@ above Arcade's MCP runtime and below your LLM.
 09:41  Agent proposed "Coordinate customer follow-up"
        ├─ Gmail.SendEmail × 2
        ├─ Calendar.CreateEvent × 2
-       └─ Slack.SendMessage × 1
+       └─ Gmail.SendEmail × 1 (internal summary)
 09:42  Human removed Calendar.CreateEvent (Globex)
-09:42  System invalidated dependent Slack message
+09:42  System invalidated dependent summary
 09:43  Agent regenerated downstream actions
-       └─ Slack message rewritten (no longer mentions Globex meeting)
+       └─ Summary email rewritten (no longer mentions Globex meeting)
 09:44  Human edited Gmail.SendEmail.body (Acme thread)
 09:45  Human approved
 09:45  Arcade executed in dependency order

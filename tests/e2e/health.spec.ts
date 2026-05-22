@@ -10,5 +10,5 @@ test('health endpoint responds', async ({ request }) => {
 
 test('home page renders the headline', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('governance runtime')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Transactional governance')
 })

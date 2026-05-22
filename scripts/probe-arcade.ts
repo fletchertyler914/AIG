@@ -3,8 +3,8 @@
  * tools per toolkit. Run with: `pnpm probe:arcade`.
  *
  * Useful as the first end-to-end check that your API key works and that the
- * toolkits required by the demo scenario (Gmail, Calendar, Slack) are
- * reachable for the configured user.
+ * toolkits useful for the demo scenario are reachable for the configured user.
+ * Slack is optional; the default demo uses Gmail + Google Calendar only.
  */
 
 import Arcade from '@arcadeai/arcadejs'
@@ -13,7 +13,7 @@ import { logger } from '@/lib/logger'
 
 const log = logger.child({ script: 'probe-arcade' })
 
-const TARGET_TOOLKITS = ['Gmail', 'GoogleCalendar', 'Slack', 'Github'] as const
+const TARGET_TOOLKITS = ['Gmail', 'GoogleCalendar', 'Github', 'Slack'] as const
 
 async function main() {
   log.info({ baseUrl: env.ARCADE_BASE_URL ?? 'default' }, 'probing arcade')

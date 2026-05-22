@@ -21,6 +21,9 @@ export const env = createEnv({
     ARCADE_API_KEY: z.string().min(1),
     ARCADE_BASE_URL: z.string().url().optional(),
     DEMO_USER_ID: z.string().email().default('demo@arcadeintent.graph'),
+    DEMO_USE_SLACK: z
+      .union([z.literal('1'), z.literal('0'), z.literal('true'), z.literal('false')])
+      .default('false'),
     E2E_MOCK_ARCADE: z
       .union([z.literal('1'), z.literal('0'), z.literal('true'), z.literal('false')])
       .optional(),
@@ -34,6 +37,7 @@ export const env = createEnv({
     ARCADE_API_KEY: process.env['ARCADE_API_KEY'],
     ARCADE_BASE_URL: process.env['ARCADE_BASE_URL'],
     DEMO_USER_ID: process.env['DEMO_USER_ID'],
+    DEMO_USE_SLACK: process.env['DEMO_USE_SLACK'],
     E2E_MOCK_ARCADE: process.env['E2E_MOCK_ARCADE'],
   },
   skipValidation:
@@ -45,3 +49,4 @@ export const isProduction = env.NODE_ENV === 'production'
 export const isTest = env.NODE_ENV === 'test'
 export const isDevelopment = env.NODE_ENV === 'development'
 export const isArcadeMocked = env.E2E_MOCK_ARCADE === '1' || env.E2E_MOCK_ARCADE === 'true'
+export const isDemoSlackEnabled = env.DEMO_USE_SLACK === '1' || env.DEMO_USE_SLACK === 'true'
