@@ -7,10 +7,8 @@
  * See ADR-0003 and `.cursor/rules/20-repair.mdc`.
  */
 
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { generateObject } from 'ai'
+import { REPAIR_SYSTEM_PROMPT } from './prompts/repair.system'
 import {
   AIGRepairContractError,
   type RepairInput,
@@ -19,8 +17,7 @@ import {
   repairResponseSchema,
 } from './types'
 
-const PROMPT_DIR = dirname(fileURLToPath(import.meta.url))
-const SYSTEM_PROMPT = readFileSync(join(PROMPT_DIR, 'prompts', 'repair.system.md'), 'utf8')
+const SYSTEM_PROMPT = REPAIR_SYSTEM_PROMPT
 
 function serializeNode(node: RepairNode) {
   return {

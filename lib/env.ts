@@ -20,6 +20,8 @@ export const env = createEnv({
     ANTHROPIC_API_KEY: z.string().min(1),
     ARCADE_API_KEY: z.string().min(1),
     ARCADE_BASE_URL: z.string().url().optional(),
+    ARCADE_MCP_GATEWAY_URL: z.string().url().optional(),
+    ARCADE_MCP_AUTH_TOKEN: z.string().min(1).optional(),
     DEMO_USER_ID: z.string().email().default('demo@arcadeintent.graph'),
     DEMO_USE_SLACK: z
       .union([z.literal('1'), z.literal('0'), z.literal('true'), z.literal('false')])
@@ -36,6 +38,8 @@ export const env = createEnv({
     ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'],
     ARCADE_API_KEY: process.env['ARCADE_API_KEY'],
     ARCADE_BASE_URL: process.env['ARCADE_BASE_URL'],
+    ARCADE_MCP_GATEWAY_URL: process.env['ARCADE_MCP_GATEWAY_URL'],
+    ARCADE_MCP_AUTH_TOKEN: process.env['ARCADE_MCP_AUTH_TOKEN'],
     DEMO_USER_ID: process.env['DEMO_USER_ID'],
     DEMO_USE_SLACK: process.env['DEMO_USE_SLACK'],
     E2E_MOCK_ARCADE: process.env['E2E_MOCK_ARCADE'],

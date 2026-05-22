@@ -29,15 +29,22 @@ if (isCI) {
   config.workers = 1
 }
 
+const useProdBuild = process.env['PLAYWRIGHT_USE_PROD_BUILD'] === '1'
+
 if (!useExternalServer) {
   config.webServer = {
-    command: 'pnpm dev',
+    command: useProdBuild ? 'pnpm build && pnpm start' : 'pnpm dev',
     url: BASE_URL,
     reuseExistingServer: !isCI,
-    timeout: 120_000,
+    timeout: useProdBuild ? 240_000 : 120_000,
     env: {
-      NODE_ENV: 'test',
+      NODE_ENV: useProdBuild ? 'production' : 'test',
       E2E_MOCK_ARCADE: '1',
+      // Plan-agent route in prod build still requires this; mocked Arcade
+      // short-circuits the actual tool execution, but the route imports
+      // anthropic provider config which needs *some* key to load.
+      ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] ?? 'test-key',
+      ARCADE_API_KEY: process.env['ARCADE_API_KEY'] ?? 'test-key',
     },
   }
 }

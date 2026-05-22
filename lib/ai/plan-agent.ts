@@ -16,20 +16,14 @@
  * deterministic — see ADR-0001 and `lib/aig/formation.ts`.
  */
 
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { generateText, jsonSchema, stepCountIs, type ToolSet, tool } from 'ai'
 import { ulid } from 'ulid'
+import { PLAN_AGENT_SYSTEM_PROMPT } from '@/lib/aig/prompts/plan-agent.system'
 import type { CapturedToolCall } from '@/lib/aig/types'
 import { getArcadeClient } from '@/lib/arcade/client'
 import { logger } from '@/lib/logger'
 
-const PROMPT_DIR = dirname(fileURLToPath(import.meta.url))
-const SYSTEM_PROMPT_TEMPLATE = readFileSync(
-  join(PROMPT_DIR, '..', 'aig', 'prompts', 'plan-agent.system.md'),
-  'utf8',
-)
+const SYSTEM_PROMPT_TEMPLATE = PLAN_AGENT_SYSTEM_PROMPT
 
 const log = logger.child({ module: 'plan-agent' })
 

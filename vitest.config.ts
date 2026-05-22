@@ -9,6 +9,7 @@ import { defineConfig } from 'vitest/config'
 const envLocal = readEnvLocal()
 const evalMode = process.env['EVAL_MODE'] ?? envLocal['EVAL_MODE'] ?? 'mock'
 const isLive = evalMode === 'live'
+const isArcadeIntegration = process.env['RUN_ARCADE_INTEGRATION'] === '1'
 
 function readEnvLocal(): Record<string, string> {
   try {
@@ -36,26 +37,49 @@ function readEnvLocal(): Record<string, string> {
 }
 
 function liveEnv(name: string, fallback: string): string {
-  return isLive ? (process.env[name] ?? envLocal[name] ?? fallback) : fallback
+  return isLive || isArcadeIntegration
+    ? (process.env[name] ?? envLocal[name] ?? fallback)
+    : fallback
+}
+
+function optionalLiveEnv(name: string): string | undefined {
+  return isLive || isArcadeIntegration ? (process.env[name] ?? envLocal[name]) : undefined
+}
+
+const testEnv: Record<string, string> = {
+  SKIP_ENV_VALIDATION: '1',
+  DATABASE_URL:
+    process.env['DATABASE_URL'] ??
+    envLocal['DATABASE_URL'] ??
+    'postgres://test:test@localhost:5432/aig_test',
+  ANTHROPIC_API_KEY: liveEnv('ANTHROPIC_API_KEY', 'test-key'),
+  ARCADE_API_KEY: liveEnv('ARCADE_API_KEY', 'test-key'),
+  DEMO_USER_ID: liveEnv('DEMO_USER_ID', 'demo@arcadeintent.graph'),
+  LOG_LEVEL: 'silent',
+  NODE_ENV: 'test',
+  EVAL_MODE: evalMode,
+}
+
+if (process.env['RUN_ARCADE_INTEGRATION']) {
+  testEnv['RUN_ARCADE_INTEGRATION'] = process.env['RUN_ARCADE_INTEGRATION']
+}
+
+const arcadeMcpGatewayUrl = optionalLiveEnv('ARCADE_MCP_GATEWAY_URL')
+if (arcadeMcpGatewayUrl) {
+  testEnv['ARCADE_MCP_GATEWAY_URL'] = arcadeMcpGatewayUrl
+}
+
+const arcadeMcpAuthToken = optionalLiveEnv('ARCADE_MCP_AUTH_TOKEN')
+if (arcadeMcpAuthToken) {
+  testEnv['ARCADE_MCP_AUTH_TOKEN'] = arcadeMcpAuthToken
 }
 
 export default defineConfig({
   test: {
     environment: 'node',
     globals: false,
-    env: {
-      SKIP_ENV_VALIDATION: '1',
-      DATABASE_URL:
-        process.env['DATABASE_URL'] ??
-        envLocal['DATABASE_URL'] ??
-        'postgres://test:test@localhost:5432/aig_test',
-      ANTHROPIC_API_KEY: liveEnv('ANTHROPIC_API_KEY', 'test-key'),
-      ARCADE_API_KEY: liveEnv('ARCADE_API_KEY', 'test-key'),
-      LOG_LEVEL: 'silent',
-      NODE_ENV: 'test',
-      EVAL_MODE: evalMode,
-    },
-    include: ['tests/unit/**/*.test.ts', 'eval/**/*.eval.ts'],
+    env: testEnv,
+    include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts', 'eval/**/*.eval.ts'],
     exclude: ['node_modules', '.next', 'tests/e2e/**'],
     coverage: {
       provider: 'v8',

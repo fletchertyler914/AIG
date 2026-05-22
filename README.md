@@ -181,20 +181,38 @@ mocks. See `scripts/live-*.ts` for the entry points.
 
 ```bash
 pnpm test:unit          # 77 pure-module tests (lib/aig, lib/ai, lib/arcade)
+pnpm test:arcade:live   # real Arcade SDK + MCP gateway integration checks
 pnpm test:eval          # 11 repair-engine cases (mock LLM, CI-fast)
 pnpm test:eval:live     # 11 repair-engine cases vs real Claude (the gate)
 pnpm test:e2e           # Playwright: dashboard → mutate → repair → approve → COMPLETE
 ```
+
+Why E2E mocks Arcade: Playwright clicks **Approve**, which transitions into
+execution. In CI, that must not send real emails or create real calendar
+events. `test:e2e` therefore validates the UI, state machine, repair engine,
+and executor with `E2E_MOCK_ARCADE=1`.
+
+The real integration gate is separate and opt-in:
+
+```bash
+ARCADE_MCP_GATEWAY_URL="https://api.arcade.dev/mcp/agi" pnpm test:arcade:live
+RUN_ARCADE_READONLY_EXECUTION=1 pnpm test:arcade:live
+```
+
+`test:arcade:live` hits real Arcade SDK endpoints (`tools.formatted.list`,
+`tools.list`, `tools.authorize`) and the configured MCP gateway. It never
+executes write tools. If `RUN_ARCADE_READONLY_EXECUTION=1` is set and
+`Gmail.WhoAmI` is authorized, it also executes that read-only tool.
 
 The repair eval gate: **11/11 contract+invariant assertions must pass
 deterministically across 3 consecutive `EVAL_MODE=live` runs** before
 any UI work ships. This repository was last validated at 11/11 × 3
 on Claude 4.5 Sonnet.
 
-End-to-end is fully isolated from real Arcade via `E2E_MOCK_ARCADE=1`
-(executor + authorize layers short-circuit), so the demo loop test
-exercises the entire UI + state machine + executor without sending
-real email or burning Claude credits.
+End-to-end remains fully isolated from real Arcade via `E2E_MOCK_ARCADE=1`
+(executor + authorize layers short-circuit), so the demo loop test exercises
+the entire UI + state machine + executor without sending real email or
+burning Claude credits.
 
 ---
 

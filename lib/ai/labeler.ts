@@ -9,18 +9,12 @@
  * conversation history is threaded through.
  */
 
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import type { IntentLabeler, LabelResult } from '@/lib/aig/formation'
+import { LABELER_SYSTEM_PROMPT } from '@/lib/aig/prompts/labeler.system'
 
-const PROMPT_DIR = dirname(fileURLToPath(import.meta.url))
-const SYSTEM_PROMPT = readFileSync(
-  join(PROMPT_DIR, '..', 'aig', 'prompts', 'labeler.system.md'),
-  'utf8',
-)
+const SYSTEM_PROMPT = LABELER_SYSTEM_PROMPT
 
 const labelerResponseSchema = z.object({
   label: z.string().min(1).max(120),
