@@ -1,0 +1,15 @@
+allowBuilds:
+  esbuild: true
+  lefthook: true
+  sharp: true
+  unrs-resolver: true
+  "@biomejs/biome": true
+minimumReleaseAgeExclude:
+  - '@ai-sdk/gateway@3.0.119'
+  - ai@6.0.190
+onlyBuiltDependencies:
+  - sharp
+  - unrs-resolver
+  - "@biomejs/biome"
+  - lefthook
+  - esbuild

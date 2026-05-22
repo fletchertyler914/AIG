@@ -1,0 +1,56 @@
+# Dependencies
+node_modules
+.pnpm-store
+.pnp
+.pnp.js
+
+# Build output
+.next
+out
+build
+dist
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing
+coverage
+.nyc_output
+test-results
+playwright-report
+playwright/.cache
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+.vercel
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Eval state
+eval/.passing-runs
+eval/.last-run.json
+
+# Local DB
+*.db
+*.sqlite
+
+# Drizzle generated
+lib/db/migrations/meta/_journal.tmp

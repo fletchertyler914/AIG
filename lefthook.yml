@@ -1,0 +1,27 @@
+assert_lefthook_installed: true
+
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{ts,tsx,js,jsx,json,jsonc}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+    typecheck:
+      glob: "*.{ts,tsx}"
+      run: pnpm typecheck
+
+pre-push:
+  parallel: false
+  commands:
+    test:
+      run: pnpm test:unit
+    eval-mock:
+      env:
+        EVAL_MODE: mock
+      run: pnpm test:eval
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}

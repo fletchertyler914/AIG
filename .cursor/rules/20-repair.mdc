@@ -1,0 +1,41 @@
+---
+description: Repair engine invariants
+globs:
+  - "lib/aig/repair.ts"
+  - "lib/aig/prompts/repair.system.md"
+  - "eval/**"
+alwaysApply: false
+---
+
+# Repair Engine Rules
+
+The repair engine is the technical moat. These invariants are non-negotiable.
+
+## Prompt-level invariants
+
+The system prompt MUST state:
+- `objective_locked: true` — the model may not rewrite the objective.
+- `approved nodes are immutable` — model must echo them verbatim in `preserve`.
+- `human-edited args are protected` — model must not modify args on
+  human-edited nodes; downstream regen must adapt around them.
+- Response format is a single structured-output call matching the zod schema.
+  No prose, no chain of thought, no alternate plans.
+
+## Code-level invariants
+
+- `repairIntent` opens a **fresh** AI SDK session per call. Do not thread
+  conversation history.
+- Response is validated with zod. On validation failure, throw — do not
+  attempt to "fix" the model output silently.
+- The function input shape MUST include the full dependency graph. Repair
+  must not be asked to infer dependencies.
+- Output shape: `{ replace: NewToolCall[], preserve: string[], remove: string[] }`.
+- Locked node IDs MUST appear in `preserve`. If the model omits one, throw.
+
+## Eval harness
+
+- 9 fixture cases in `eval/fixtures/case-{01..09}.json`.
+- Two modes: `EVAL_MODE=mock` (canned responses in `eval/mocks/`) and
+  `EVAL_MODE=live` (real Claude).
+- Live mode must hit 9/9 deterministically across 3 consecutive runs before
+  Phase 3 starts. Track passing-run counts in `eval/.passing-runs`.

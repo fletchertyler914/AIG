@@ -1,0 +1,36 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+    open-pull-requests-limit: 5
+    groups:
+      ai-stack:
+        patterns:
+          - 'ai'
+          - '@ai-sdk/*'
+      next-stack:
+        patterns:
+          - 'next'
+          - 'react'
+          - 'react-dom'
+          - '@types/react*'
+      drizzle:
+        patterns:
+          - 'drizzle-*'
+      tooling:
+        patterns:
+          - '@biomejs/*'
+          - 'vitest*'
+          - '@vitest/*'
+          - 'lefthook'
+          - 'tsx'
+          - 'typescript'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

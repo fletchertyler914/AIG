@@ -1,0 +1,26 @@
+---
+description: Arcade integration boundaries
+globs:
+  - "lib/arcade/**"
+  - "lib/aig/executor.ts"
+  - "scripts/probe-arcade.ts"
+alwaysApply: false
+---
+
+# Arcade Integration Rules
+
+- `@arcadeai/arcadejs` is imported ONLY from `lib/arcade/**`. Anywhere else
+  must go through the typed wrappers in `lib/arcade/tools.ts`.
+- The Arcade client is a singleton — instantiate it once via
+  `lib/arcade/client.ts` and reuse.
+- Every call to `client.tools.execute` MUST pass an explicit `user_id`. The
+  `user_id` MUST equal the `approved_by` field on the parent intent —
+  enforced by `lib/aig/executor.ts` and surfaced as `AIGBlockedAuthError`
+  when violated.
+- Use `client.tools.formatted.list({ format: 'anthropic', toolkit })` to
+  fetch tool definitions for Claude. Do not hand-wrap tool schemas.
+- Never log API keys. Pino is configured to redact `ARCADE_API_KEY` and any
+  field matching `*.apiKey`.
+- The mock Arcade client (`lib/arcade/mock.ts`, used when
+  `E2E_MOCK_ARCADE=1`) MUST match the real client's type surface exactly
+  so the executor cannot tell them apart at the type level.

@@ -1,0 +1,44 @@
+---
+description: Module boundaries and import rules for AIG
+alwaysApply: true
+---
+
+# AIG Architecture Rules
+
+Read `AGENTS.md` for full context. This rule enforces the hard module
+boundaries every change must respect.
+
+## Forbidden imports
+
+- `lib/aig/**` MUST NOT import from `lib/db/**`, `lib/arcade/**`, `lib/ai/**`,
+  or any package that performs I/O (`postgres`, `@arcadeai/arcadejs`, `ai`,
+  `@ai-sdk/*`, `node:fs`, `node:net`, `fetch`).
+- `app/**` and `components/**` MUST NOT import `lib/db/**` or `lib/arcade/**`
+  directly. Use a route handler or server action.
+- Nothing outside `lib/env.ts` reads `process.env`.
+- Nothing outside `lib/logger.ts` constructs a `pino` logger.
+
+## Side-effect placement
+
+- DB calls: `lib/db/queries.ts` (Drizzle queries only).
+- Arcade calls: `lib/arcade/client.ts` and `lib/arcade/tools.ts`.
+- LLM calls: `lib/ai/plan-agent.ts` and `lib/aig/repair.ts` (via `lib/ai/anthropic.ts`).
+- HTTP boundaries: `app/api/**/route.ts` only.
+
+## TypeScript hygiene
+
+- No `any`. Use `unknown` + zod parse, or a precise generic.
+- `import type` for type-only imports (`verbatimModuleSyntax` enforces).
+- Zod schemas live next to the route handler / function that uses them, or
+  in `lib/aig/types.ts` if they are domain primitives.
+- Result types: prefer `{ ok: true, data } | { ok: false, error }` for any
+  function that can fail in a non-exceptional way. Throw only for invariants.
+
+## State machine
+
+- Any change to intent status MUST go through `assertTransition()`.
+- New transitions require a unit test in `tests/unit/state.test.ts`.
+
+## Repair changes
+
+- See `.cursor/rules/20-repair.mdc`.

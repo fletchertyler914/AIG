@@ -1,0 +1,22 @@
+---
+description: State machine guardrails
+globs:
+  - "lib/aig/state.ts"
+  - "tests/unit/state.test.ts"
+alwaysApply: false
+---
+
+# State Machine Rules
+
+- VALID_TRANSITIONS is the single source of truth. Don't fork it.
+- Terminal states (`COMPLETE`, `FAILED`, `BLOCKED`, `EXPIRED`) MUST have
+  empty transition arrays. Adding outgoing transitions to a terminal state is
+  a breaking change requiring an ADR.
+- `isToolCallImmutable` MUST return `true` for any ToolCall whose status is
+  `approved` or `done`, or whose parent intent is in any post-APPROVED state.
+- `computeInvalidatedIds` must traverse the dependency graph breadth-first
+  and return the transitive closure including the seeds themselves.
+- `topologicalSort` MUST throw on cycle detection — silent partial sorts
+  are forbidden.
+- Every public function in `state.ts` requires a unit test covering both
+  the happy path and at least one invariant-violation path.
