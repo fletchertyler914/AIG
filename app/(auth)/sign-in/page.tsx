@@ -2,6 +2,7 @@ import { ArrowLeft, MailCheck } from 'lucide-react'
 import Link from 'next/link'
 import { SignInForm } from '@/components/auth/sign-in-form'
 import { Card, CardContent } from '@/components/ui/card'
+import { isDevelopment } from '@/lib/env'
 
 interface SignInPageProps {
   searchParams: Promise<{ callbackUrl?: string; sent?: string }>
@@ -59,9 +60,13 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
                 <div className="space-y-1">
                   <p className="font-medium text-sm text-success">Check your inbox</p>
                   <p className="text-muted-foreground text-sm leading-relaxed">
-                    We sent a sign-in link. It expires in 15 minutes. In dev without Resend, check
-                    your terminal for the URL.
+                    We sent a sign-in link. It expires in 15 minutes.
                   </p>
+                  {isDevelopment ? (
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      Dev tip: if Resend delivery fails, the link is printed to the dev server logs.
+                    </p>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
