@@ -2,7 +2,7 @@
 
 import { LogOut, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth/client'
@@ -18,6 +18,7 @@ interface AppHeaderProps {
 export function AppHeader({ email, workspaceName, workspaceKind }: AppHeaderProps) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
+  const menuId = useId()
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -25,8 +26,15 @@ export function AppHeader({ email, workspaceName, workspaceKind }: AppHeaderProp
     const handler = (event: MouseEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
     }
+    const keyHandler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('keydown', keyHandler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('keydown', keyHandler)
+    }
   }, [menuOpen])
 
   const signOut = async () => {
@@ -80,6 +88,8 @@ export function AppHeader({ email, workspaceName, workspaceKind }: AppHeaderProp
           onClick={() => setMenuOpen((v) => !v)}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
+          aria-controls={menuId}
+          aria-label="Open account menu"
           className={cn(
             'flex items-center gap-2 rounded-md border border-border bg-surface-1 py-1 pr-3 pl-1 text-sm shadow-arcade transition-colors hover:bg-surface-2',
             menuOpen && 'bg-surface-2',
@@ -95,6 +105,7 @@ export function AppHeader({ email, workspaceName, workspaceKind }: AppHeaderProp
 
         {menuOpen ? (
           <div
+            id={menuId}
             role="menu"
             className="absolute top-full right-0 mt-2 w-64 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-arcade-lg"
           >
@@ -106,6 +117,7 @@ export function AppHeader({ email, workspaceName, workspaceKind }: AppHeaderProp
               <button
                 type="button"
                 role="menuitem"
+                tabIndex={0}
                 className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-foreground text-sm transition-colors hover:bg-surface-2"
                 onClick={() => void signOut()}
               >

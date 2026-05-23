@@ -1,6 +1,14 @@
 'use client'
 
-import { Activity, Download, GitBranch, Link2, PlayCircle, ShieldCheck } from 'lucide-react'
+import {
+  Activity,
+  Download,
+  GitBranch,
+  Link2,
+  Loader2,
+  PlayCircle,
+  ShieldCheck,
+} from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -78,7 +86,7 @@ export function InsightsClient() {
       />
 
       {!insights ? (
-        <p className="text-muted-foreground text-sm">Loading…</p>
+        <InsightsLoadingState />
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -147,6 +155,26 @@ export function InsightsClient() {
         </>
       )}
     </Container>
+  )
+}
+
+function InsightsLoadingState() {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {['Total runs', 'Pipelines', 'Connected toolkits', 'Enabled for planning'].map((label) => (
+        <Card key={label}>
+          <CardContent className="flex items-center gap-3 p-4 sm:p-5">
+            <div className="flex size-10 items-center justify-center rounded-md border border-border bg-surface-2 text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-muted-foreground text-xs">{label}</p>
+              <div className="h-5 w-14 rounded bg-surface-2" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   )
 }
 

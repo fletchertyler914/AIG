@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, CheckCircle2, GitBranch, LayoutGrid, List, Lock } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, GitBranch, LayoutGrid, List, Loader2, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
@@ -116,9 +116,19 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
   if (!data) {
     return (
       <Container width="wide" className="flex flex-1 items-center justify-center py-20">
-        <p className="font-mono text-muted-foreground text-sm uppercase tracking-widest">
-          Loading intent…
-        </p>
+        <Card className="w-full max-w-md">
+          <CardContent className="flex items-start gap-4 p-5 sm:p-6">
+            <div className="grid-bg flex size-10 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
+              <Loader2 className="size-5 animate-spin" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-sm">Loading intent review</p>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Fetching the locked objective, dependency graph, and co-authorship trace.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </Container>
     )
   }
