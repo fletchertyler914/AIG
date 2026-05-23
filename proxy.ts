@@ -20,8 +20,14 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Better Auth prefixes cookies with `__Secure-` when useSecureCookies is on
+  // (production). Cookie cache (`session_data`) is also present when the user
+  // is signed in; checking either is sufficient to gate the session redirect.
   const sessionCookie =
-    request.cookies.get('aig.session_token') ?? request.cookies.get('better-auth.session_token')
+    request.cookies.get('aig.session_token') ??
+    request.cookies.get('__Secure-aig.session_token') ??
+    request.cookies.get('aig.session_data') ??
+    request.cookies.get('__Secure-aig.session_data')
 
   if (!sessionCookie?.value) {
     const signIn = new URL('/sign-in', request.url)
