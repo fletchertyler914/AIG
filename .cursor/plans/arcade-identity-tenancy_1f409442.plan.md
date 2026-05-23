@@ -1,9 +1,10 @@
 ---
 name: aig-control-plane-roadmap
 overview: >-
-  Control-plane delivery roadmap for AIG. Phases 1-5 plus the first Sprint 4
-  approval-policy slice are shipped on the current branch. Pending phases:
-  production cutover, reviewer-role/team management, remaining product gaps.
+  Control-plane delivery roadmap for AIG. Phases 1-5, Sprint 4 approval
+  policies/team settings, and the remaining non-manual product gaps are shipped.
+  Pending phases: production Arcade OAuth cutover, reviewer-role policy depth,
+  and audit/export polish.
 todos:
   # ── Phase 1: Arcade identity + connections (DONE) ────────────────────────
   - id: adr
@@ -77,8 +78,11 @@ todos:
   - id: dashboard-oauth
     content: 'MANUAL — Arcade Dashboard: switch to custom verifier + Google OAuth credentials for prod tenant'
     status: pending
+  - id: custom-domain-env
+    content: Vercel env uses arcadeintentgraph.xyz in prod; preview deployments derive origin from VERCEL_URL
+    status: completed
   - id: prod-cutover
-    content: 'Set ARCADE_VERIFIER_MODE=custom in Vercel; push branch; live E2E against prod tenant'
+    content: 'Bind custom domain, verify Resend domain, push branch, then live E2E against prod tenant'
     status: pending
   # ── Phase 7: Approval policies (IN PROGRESS) ─────────────────────────────
   - id: policies
@@ -105,9 +109,8 @@ isProject: true
 
 # AIG control plane roadmap
 
-**Branch state:** synced through `fe9cd74`, with the current uncommitted Sprint 4
-approval-policy, team settings, add-action/replan, and seeded-pipeline work
-documented below.
+**Branch state:** synced through `efa387a`, with the current uncommitted
+production env/origin polish documented below.
 
 ---
 
@@ -199,10 +202,12 @@ authorized intent in production.
 
 | Task | Owner | Notes |
 | ---- | ----- | ----- |
-| Custom verifier URL in Arcade Dashboard | Manual | `${BETTER_AUTH_URL}/api/arcade/verify` |
+| Custom domain in Vercel | Manual | `https://arcadeintentgraph.xyz` must be bound before prod E2E |
+| Resend sender domain | Manual | Verify `updates.arcadeintentgraph.xyz`; prod `EMAIL_FROM` uses that subdomain |
+| Custom verifier URL in Arcade Dashboard | Manual | `https://arcadeintentgraph.xyz/api/arcade/verify` |
 | Google OAuth app in Arcade Dashboard | Manual | One app covers all Google toolkits |
-| `ARCADE_VERIFIER_MODE=custom` in Vercel | Manual | Identity flips to `user:{id}` / `workspace:{id}` |
-| Push branch + verify intent Authorize round-trip | Code | Already wired |
+| Prod/preview auth origin | Code | `getPublicAppOrigin()` uses `BETTER_AUTH_URL` in prod and `VERCEL_URL` in preview |
+| Push branch + verify intent Authorize round-trip | Code | Already wired; production defaults to custom verifier mode |
 | Playwright magic-link auth (replace `E2E_SKIP_AUTH=1` incrementally) | Code | Fixtures already in place |
 
 **Quality gate before push:**

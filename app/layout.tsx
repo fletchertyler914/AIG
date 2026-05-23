@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from 'sonner'
@@ -44,6 +45,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} flex min-h-dvh flex-col bg-background font-sans text-foreground antialiased`}
       >
         {children}
+        <Analytics />
         <Toaster richColors closeButton position="bottom-right" />
       </body>
     </html>

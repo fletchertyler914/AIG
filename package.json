@@ -59,6 +59,7 @@
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@t3-oss/env-nextjs": "^0.13.11",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/otel": "^2.1.2",
     "ai": "^6.0.190",
     "better-auth": "^1.6.11",

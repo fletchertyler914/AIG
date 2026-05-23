@@ -20,7 +20,7 @@ import {
   upsertToolkitConnection,
 } from '@/lib/db/connection-queries'
 import type { ConnectionAuthStatus, ToolkitConnection } from '@/lib/db/schema'
-import { env, getArcadeVerifierMode } from '@/lib/env'
+import { getArcadeVerifierMode, getPublicAppOrigin } from '@/lib/env'
 import { logger } from '@/lib/logger'
 
 const log = logger.child({ route: '/api/connections' })
@@ -236,11 +236,12 @@ export async function POST(request: Request) {
 }
 
 function safeReturnTo(returnTo: string | undefined): string {
-  const fallback = `${env.BETTER_AUTH_URL}/app/connections`
+  const appOrigin = getPublicAppOrigin()
+  const fallback = `${appOrigin}/app/connections`
   if (!returnTo) return fallback
 
   try {
-    const base = new URL(env.BETTER_AUTH_URL)
+    const base = new URL(appOrigin)
     const url = new URL(returnTo, base)
     if (url.origin !== base.origin || !url.pathname.startsWith('/app/')) {
       return fallback

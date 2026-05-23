@@ -18,11 +18,11 @@ import { nextCookies } from 'better-auth/next-js'
 import { magicLink, organization } from 'better-auth/plugins'
 import { db, schema as dbSchema } from '@/lib/db/client'
 import { sendMagicLinkEmail } from '@/lib/email/magic-link'
-import { env, isProduction } from '@/lib/env'
+import { env, getPublicAppOrigin, isProduction } from '@/lib/env'
 import { logger } from '@/lib/logger'
 
 export const auth = betterAuth({
-  baseURL: env.BETTER_AUTH_URL,
+  baseURL: getPublicAppOrigin(),
   secret: env.BETTER_AUTH_SECRET,
 
   database: drizzleAdapter(db, {

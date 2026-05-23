@@ -3,7 +3,7 @@ import { arcadeIdentityForScope } from '@/lib/arcade/identity'
 import { confirmArcadeUser } from '@/lib/arcade/verifier'
 import { requireSession } from '@/lib/auth/session'
 import { clearPendingFlow, getToolkitConnectionByPendingFlow } from '@/lib/db/connection-queries'
-import { env, usesArcadeUserVerifier } from '@/lib/env'
+import { getPublicAppOrigin, usesArcadeUserVerifier } from '@/lib/env'
 import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -18,15 +18,16 @@ const log = logger.child({ route: 'GET /api/arcade/verify' })
  * `${BETTER_AUTH_URL}/api/arcade/verify`
  */
 export async function GET(request: Request) {
+  const appOrigin = getPublicAppOrigin()
   const url = new URL(request.url)
   const flowId = url.searchParams.get('flow_id')
 
   if (!flowId) {
-    return redirect(`${env.BETTER_AUTH_URL}/app/connections?error=missing_flow_id`)
+    return redirect(`${appOrigin}/app/connections?error=missing_flow_id`)
   }
 
   if (usesArcadeUserVerifier()) {
-    return redirect(`${env.BETTER_AUTH_URL}/app/connections?error=arcade_verifier_mode`)
+    return redirect(`${appOrigin}/app/connections?error=arcade_verifier_mode`)
   }
 
   try {
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
 
     if (!binding) {
       log.warn({ flowId }, 'no pending flow binding found')
-      return redirect(`${env.BETTER_AUTH_URL}/app/connections?error=unknown_flow`)
+      return redirect(`${appOrigin}/app/connections?error=unknown_flow`)
     }
 
     const identity = arcadeIdentityForScope({
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
         { flowId, ownerUserId: binding.ownerUserId, sessionUserId: session.user.id },
         'personal flow user mismatch',
       )
-      return redirect(`${env.BETTER_AUTH_URL}/app/connections?error=user_mismatch`)
+      return redirect(`${appOrigin}/app/connections?error=user_mismatch`)
     }
 
     const result = await confirmArcadeUser({ flowId, identity })
@@ -61,10 +62,10 @@ export async function GET(request: Request) {
       connectedAt: Date.now(),
     })
 
-    const destination = result.nextUri ?? `${env.BETTER_AUTH_URL}/app/connections?connected=1`
+    const destination = result.nextUri ?? `${appOrigin}/app/connections?connected=1`
     return redirect(destination)
   } catch (error) {
     log.error({ err: error, flowId }, 'arcade verifier failed')
-    return redirect(`${env.BETTER_AUTH_URL}/app/connections?error=verify_failed`)
+    return redirect(`${appOrigin}/app/connections?error=verify_failed`)
   }
 }

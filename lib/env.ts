@@ -27,6 +27,10 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: z.string().min(32),
     /** Public origin of the app, used by Better Auth for callback URLs. */
     BETTER_AUTH_URL: z.string().url(),
+    /** Vercel deployment environment; provided automatically on Vercel. */
+    VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
+    /** Vercel deployment hostname; provided automatically without protocol. */
+    VERCEL_URL: z.string().min(1).optional(),
     /** Resend API key for magic-link delivery. Optional in dev (logs to console). */
     RESEND_API_KEY: z.string().min(1).optional(),
     /** From address for magic-link + notification emails. */
@@ -67,6 +71,8 @@ export const env = createEnv({
     ARCADE_MCP_AUTH_TOKEN: process.env['ARCADE_MCP_AUTH_TOKEN'],
     BETTER_AUTH_SECRET: process.env['BETTER_AUTH_SECRET'],
     BETTER_AUTH_URL: process.env['BETTER_AUTH_URL'],
+    VERCEL_ENV: process.env['VERCEL_ENV'],
+    VERCEL_URL: process.env['VERCEL_URL'],
     RESEND_API_KEY: process.env['RESEND_API_KEY'],
     EMAIL_FROM: process.env['EMAIL_FROM'],
     DEMO_USER_ID: process.env['DEMO_USER_ID'],
@@ -102,3 +108,19 @@ export function usesArcadeUserVerifier(): boolean {
   return getArcadeVerifierMode() === 'arcade'
 }
 export const isDemoSlackEnabled = env.DEMO_USE_SLACK === '1' || env.DEMO_USE_SLACK === 'true'
+
+/**
+ * Public origin for auth callbacks and OAuth return URLs.
+ *
+ * Production uses the canonical custom domain from BETTER_AUTH_URL. Preview
+ * deployments use Vercel's per-deployment URL so cookies and callbacks match
+ * the preview hostname being tested.
+ */
+export function getPublicAppOrigin(): string {
+  if (env.VERCEL_ENV === 'preview' && env.VERCEL_URL) {
+    const host = env.VERCEL_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')
+    return `https://${host}`
+  }
+
+  return env.BETTER_AUTH_URL.replace(/\/$/, '')
+}
