@@ -104,7 +104,9 @@ lib/ai/                 ONLY place that imports `ai` or `@ai-sdk/*`.
   └── labeler.ts
 lib/api/                Shared HTTP helpers (jsonOk, parseJson, …).
 lib/env.ts              ONLY place that reads process.env. Also resolves
-                        ARCADE_VERIFIER_MODE (arcade in dev, custom in prod).
+                        ARCADE_VERIFIER_MODE (arcade everywhere by default for
+                        single-project setups; custom only when each env has
+                        its own Arcade project).
 lib/logger.ts           ONLY place that imports `pino`.
 proxy.ts                Next 16 proxy (was `middleware.ts`). Session-cookie
                         gate for /app/**. Edge runtime — reads process.env
@@ -160,16 +162,17 @@ Cursor rule: `.cursor/rules/40-auth-tenancy.mdc`.
 ## 3c. Connections & toolkit scope
 
 Toolkit OAuth is stored in `toolkit_connections` with scope `personal` or
-`shared` (ADR-0010):
+`shared` (ADR-0010). The Arcade Dashboard "custom verifier" setting is
+project-global, so **a single Arcade project = a single verifier mode**.
 
-| Mode | Personal `user_id` | Shared `user_id` | Default |
-| ---- | ------------------ | ---------------- | ------- |
-| `custom` | `user:{betterAuthUserId}` | `workspace:{workspaceId}` | production |
-| `arcade` | operator email | not supported | local dev |
+| Mode | Personal `user_id` | Shared `user_id` | When to use |
+| ---- | ------------------ | ---------------- | ----------- |
+| `arcade` (recommended default) | operator email | not supported | One Arcade project across envs; Arcade default OAuth apps |
+| `custom` (opt-in) | `user:{betterAuthUserId}` | `workspace:{workspaceId}` | Dedicated prod Arcade project + BYO OAuth + custom verifier URL |
 
-Set with `ARCADE_VERIFIER_MODE`. Custom mode requires the verifier route + BYO
-OAuth credentials in Arcade Dashboard. Arcade mode uses Arcade's built-in user
-verifier and Arcade default OAuth apps.
+Set with `ARCADE_VERIFIER_MODE` per environment. Custom mode requires the
+verifier route + BYO OAuth credentials in the Arcade Dashboard **and** a
+dedicated Arcade project for that environment.
 
 At execution, `resolveConnectionForTool()` picks personal → shared → blocked.
 Pure validation lives in `lib/aig/connection-auth.ts`.
@@ -345,7 +348,7 @@ Repair eval live gate (9/9 × 3 runs) before shipping repair prompt changes.
 - Secrets and env parsing only in `lib/env.ts`.
 - Structured logging with redaction in `lib/logger.ts`.
 - Zod validation on every mutating API boundary.
-- Arcade OAuth isolated from AIG sign-in; custom verifier required for production
-  multi-user (ADR-0010).
+- Arcade OAuth isolated from AIG sign-in; custom verifier requires a dedicated
+ prod Arcade project (ADR-0010 — single-project default uses `arcade` mode).
 
 ---

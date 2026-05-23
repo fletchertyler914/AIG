@@ -66,6 +66,38 @@ export function arcadeIdentityForScope(input: {
     : sharedArcadeIdentity(input.workspaceId)
 }
 
+/**
+ * Resolve the Arcade `user_id` to use for tool execution/discovery for a
+ * connection row. Always uses the current verifier mode — never a stale value
+ * persisted when the operator connected from a different environment.
+ */
+export function resolveArcadeUserIdForConnection(input: {
+  connection: {
+    scope: ConnectionScope
+    ownerUserId: string | null
+  }
+  operator: {
+    userId: string
+    email: string
+    workspaceId: string
+  }
+  verifierMode?: ArcadeVerifierMode
+}): string {
+  const identity = arcadeIdentityForScope({
+    scope: input.connection.scope,
+    userId:
+      input.connection.scope === 'personal'
+        ? (input.connection.ownerUserId ?? input.operator.userId)
+        : input.operator.userId,
+    workspaceId: input.operator.workspaceId,
+    email: input.operator.email,
+  })
+  return toArcadeUserId(
+    identity,
+    input.verifierMode !== undefined ? { verifierMode: input.verifierMode } : undefined,
+  )
+}
+
 /** Extract toolkit name from a fully-qualified Arcade tool, e.g. "Gmail.SendEmail@7.0.0". */
 export function toolkitFromToolName(tool: string): string {
   const base = tool.split('@')[0] ?? tool

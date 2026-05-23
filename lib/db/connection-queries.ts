@@ -145,6 +145,7 @@ export async function upsertToolkitConnection(input: {
   providerId?: string | null
   arcadeUserId?: string | null
   pendingFlowId?: string | null
+  oauthReturnTo?: string | null
   connectedAt?: number | null
 }): Promise<ToolkitConnection> {
   const now = Date.now()
@@ -178,6 +179,7 @@ export async function upsertToolkitConnection(input: {
         ...(input.authUrl !== undefined ? { authUrl: input.authUrl } : {}),
         ...(input.providerId !== undefined ? { providerId: input.providerId } : {}),
         ...(pendingFlowId !== null ? { pendingFlowId } : {}),
+        ...(input.oauthReturnTo !== undefined ? { oauthReturnTo: input.oauthReturnTo } : {}),
         ...(input.connectedAt !== undefined ? { connectedAt: input.connectedAt } : {}),
         lastCheckedAt: now,
         updatedAt: now,
@@ -205,6 +207,7 @@ export async function upsertToolkitConnection(input: {
       providerId: input.providerId ?? null,
       arcadeUserId,
       pendingFlowId,
+      oauthReturnTo: input.oauthReturnTo ?? null,
       connectedAt: input.connectedAt ?? null,
       lastCheckedAt: now,
       updatedAt: now,
@@ -313,6 +316,7 @@ export async function setToolkitConnectionEnabled(input: {
  */
 export async function markConnectionCompleted(
   connectionId: string,
+  options?: { arcadeUserId?: string },
 ): Promise<ToolkitConnection | null> {
   const now = Date.now()
   const [row] = await db
@@ -324,6 +328,7 @@ export async function markConnectionCompleted(
       connectedAt: now,
       lastCheckedAt: now,
       updatedAt: now,
+      ...(options?.arcadeUserId ? { arcadeUserId: options.arcadeUserId } : {}),
     })
     .where(eq(toolkitConnections.id, connectionId))
     .returning()
@@ -398,6 +403,7 @@ export async function clearPendingFlow(input: {
     .set({
       pendingFlowId: null,
       authUrl: null,
+      oauthReturnTo: null,
       authStatus: input.authStatus,
       ...(input.connectedAt !== undefined ? { connectedAt: input.connectedAt } : {}),
       lastCheckedAt: Date.now(),

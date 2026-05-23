@@ -310,8 +310,7 @@ export function ConnectionsClient() {
         <div className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
           <ShieldAlert className="mt-0.5 size-4 shrink-0 text-primary" />
           <p className="text-muted-foreground leading-relaxed">
-            <strong className="text-foreground">Local dev mode.</strong> Arcade user verifier is
-            active — sign into{' '}
+            <strong className="text-foreground">Arcade user verifier.</strong> Sign into{' '}
             <a
               className="text-primary hover:underline"
               href="https://app.arcade.dev"
@@ -320,8 +319,8 @@ export function ConnectionsClient() {
             >
               arcade.dev
             </a>{' '}
-            with the same email you use in AIG. Workspace-scoped connections require production
-            custom verifier mode.
+            with the same email you use in AIG. Workspace-scoped connections require custom verifier
+            mode (a dedicated Arcade project).
           </p>
         </div>
       ) : null}

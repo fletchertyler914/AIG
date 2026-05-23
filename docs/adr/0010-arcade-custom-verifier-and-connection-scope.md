@@ -3,6 +3,8 @@
 ## Status
 
 Accepted — May 2026. Amended May 2026 (dev/prod verifier mode + scoped removal).
+Amended May 2026 (single-project default — Arcade Dashboard verifier setting is
+project-global, see "Single-project default" below).
 
 ## Context
 
@@ -74,24 +76,45 @@ Violations throw `AIGBlockedAuthError`.
 
 ## Amendments (May 2026)
 
-### Dev/prod verifier mode
+### Single-project default (current recommendation)
 
-The original decision implied custom verifier everywhere. In practice the
-local-dev experience is much smoother with Arcade's built-in user verifier
-(no BYO OAuth apps, no public verifier URL). We added `ARCADE_VERIFIER_MODE`
-to `lib/env.ts` with two values:
+Custom verifier mode requires Arcade Dashboard → Auth → User Verifier to point
+at a single public URL. **That setting is project-global** — one Arcade project
+cannot route some OAuth flows to localhost and others to production. In
+practice this means a single-Arcade-project setup must pick one mode for both
+dev and prod.
+
+For MVP and most teams, the recommended default is:
+
+- Set `ARCADE_VERIFIER_MODE=arcade` in **both** dev and prod env.
+- Keep the Arcade Dashboard on **Arcade user verifier** (no custom URL configured).
+- Each AIG operator's email is their Arcade `user_id` (Better Auth already
+  enforces unique emails, so identity stays stable).
+
+Custom verifier mode is still supported in code, but you only get value from it
+when you operate **two Arcade projects** (one per environment) so each
+Dashboard can have its own verifier URL. Until that day, `arcade` mode in both
+envs is the cleanest path.
+
+### Dev/prod verifier mode (legacy two-mode plan)
+
+Earlier amendments described `custom` as the production default. That still
+works *if* you have a dedicated prod Arcade project and accept BYO OAuth apps
+per provider. Mode matrix:
 
 | Mode | Personal `user_id` | Shared | Use |
 | ---- | ------------------ | ------ | --- |
-| `custom` (prod default) | `user:{betterAuthUserId}` | `workspace:{workspaceId}` | Multi-user production with BYO OAuth |
-| `arcade` (dev default) | operator email | not supported | Single operator local dev with Arcade default OAuth apps |
+| `arcade` (recommended single-project default) | operator email | not supported | Single Arcade project across envs; default OAuth apps |
+| `custom` (multi-project production) | `user:{betterAuthUserId}` | `workspace:{workspaceId}` | Dedicated prod Arcade project + BYO OAuth |
 
 `lib/arcade/identity.ts` branches on the resolved mode; the chokepoint rule
-still holds. `authorizeToolkit` also omits `next_uri` in `arcade` mode —
-Arcade's user verifier rejects arbitrary return URIs.
+still holds. `authorizeToolkit` never passes `next_uri` to `tools.authorize`
+in either mode — Arcade rejects arbitrary return URIs. Post-OAuth return is
+handled per-row via `oauth_return_to` on the connection (custom mode hits
+`/api/arcade/verify`; arcade mode relies on the tab focus + connection sync).
 
-The "never email as `user_id`" rule remains in force for `custom` (production)
-mode. Falling back to email under `arcade` mode is deliberate so dev users see
+The "never email as `user_id`" rule remains in force for `custom` mode.
+Falling back to email under `arcade` mode is deliberate so dev users see
 the same OAuth experience they'd see on arcade.dev's playground.
 
 ### Scoped toolkit removal

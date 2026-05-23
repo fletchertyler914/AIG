@@ -97,11 +97,13 @@ export const isE2eCaptureMagicLink =
 
 export type ArcadeVerifierMode = 'arcade' | 'custom'
 
-/** Resolved verifier mode — defaults to arcade in dev, custom in production/test. */
+/**
+ * Resolved verifier mode. Defaults to `arcade` in every environment — see ADR-0010
+ * (single-project default). Set `ARCADE_VERIFIER_MODE=custom` explicitly when
+ * the environment has its own Arcade project with a configured custom verifier URL.
+ */
 export function getArcadeVerifierMode(): ArcadeVerifierMode {
-  if (env.ARCADE_VERIFIER_MODE) return env.ARCADE_VERIFIER_MODE
-  if (isProduction || isTest) return 'custom'
-  return 'arcade'
+  return env.ARCADE_VERIFIER_MODE ?? 'arcade'
 }
 
 export function usesArcadeUserVerifier(): boolean {

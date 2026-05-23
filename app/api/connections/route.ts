@@ -20,6 +20,7 @@ import {
   upsertToolkitConnection,
 } from '@/lib/db/connection-queries'
 import type { ConnectionAuthStatus, ToolkitConnection } from '@/lib/db/schema'
+import { resolveOAuthReturnTo } from '@/lib/display/oauth-return'
 import { getArcadeVerifierMode, getPublicAppOrigin } from '@/lib/env'
 import { logger } from '@/lib/logger'
 
@@ -62,7 +63,9 @@ async function syncPendingConnections(input: {
           identity,
         })
         if (auth.status === 'completed') {
-          const updated = await markConnectionCompleted(row.id)
+          const updated = await markConnectionCompleted(row.id, {
+            arcadeUserId: toArcadeUserId(identity),
+          })
           return [row.id, updated ?? row] as const
         }
         await touchConnectionLastChecked(row.id)
@@ -207,11 +210,15 @@ export async function POST(request: Request) {
     })
     if (!entry) return jsonError(`Unknown Arcade toolkit: ${body.toolkitName}`, 404)
 
+    const returnDestination = resolveOAuthReturnTo({
+      appOrigin: getPublicAppOrigin(),
+      returnTo: body.returnTo,
+    })
+
     const auth = await authorizeToolkit({
       toolkitName: entry.name,
       representativeTool: entry.representativeTool,
       identity,
-      nextUri: safeReturnTo(body.returnTo),
     })
 
     const connection = await upsertToolkitConnection({
@@ -226,29 +233,13 @@ export async function POST(request: Request) {
       providerId: auth.providerId ?? null,
       arcadeUserId,
       pendingFlowId: auth.pendingFlowId ?? null,
+      oauthReturnTo: returnDestination,
       connectedAt: auth.status === 'completed' ? Date.now() : null,
     })
 
     return jsonOk({ connection: toDto(entry, body.scope, connection) })
   } catch (error) {
     return jsonError(messageFromUnknown(error), 400)
-  }
-}
-
-function safeReturnTo(returnTo: string | undefined): string {
-  const appOrigin = getPublicAppOrigin()
-  const fallback = `${appOrigin}/app/connections`
-  if (!returnTo) return fallback
-
-  try {
-    const base = new URL(appOrigin)
-    const url = new URL(returnTo, base)
-    if (url.origin !== base.origin || !url.pathname.startsWith('/app/')) {
-      return fallback
-    }
-    return url.toString()
-  } catch {
-    return fallback
   }
 }
 

@@ -25,25 +25,29 @@ See ADR-0010. Prefer SDK over hand-rolled HTTP (also `AGENTS.md` §3a).
 - Singleton client via `lib/arcade/client.ts`. App-level cache + inflight dedup
   is allowed; reimplementing wire protocol is not.
 
-## Identity (non-negotiable in production)
+## Identity
 
 - All Arcade `user_id` values go through `lib/arcade/identity.ts`.
-- **`ARCADE_VERIFIER_MODE=custom`** (production default): personal →
+- **`ARCADE_VERIFIER_MODE=arcade`** (recommended single-project default): personal
+  OAuth uses the operator email so Arcade's built-in user verifier matches the
+  arcade.dev session. Shared connections are disabled — they require custom verifier.
+- **`ARCADE_VERIFIER_MODE=custom`** (multi-project / production-only): personal →
   `user:{betterAuthUserId}`, shared → `workspace:{workspaceId}`. Never pass raw
-  email as Arcade `user_id` in this mode.
-- **`ARCADE_VERIFIER_MODE=arcade`** (local dev default): personal OAuth uses the
-  operator email so Arcade's built-in user verifier matches the arcade.dev session.
-  Shared connections are disabled — they require custom verifier.
+  email as Arcade `user_id` in this mode. Requires a **dedicated Arcade project
+  per environment** because the Dashboard's verifier URL setting is project-global.
 
 ## OAuth & verifier
 
-- Start OAuth via `lib/arcade/authorize.ts` (`tools.authorize`).
-- **Production:** Custom verifier at `/api/arcade/verify` calls `auth.confirmUser`
-  via `lib/arcade/verifier.ts`. Dashboard URL: `${BETTER_AUTH_URL}/api/arcade/verify`.
-- **Local dev:** Keep Arcade Dashboard on **Arcade user verifier**; sign into
-  arcade.dev with the same email as AIG. Arcade default OAuth apps work without
-  BYO credentials. `authorizeToolkit` MUST omit `next_uri` in `arcade` mode —
-  Arcade's user verifier rejects arbitrary return URIs.
+- Start OAuth via `lib/arcade/authorize.ts` (`tools.authorize`). `authorizeToolkit`
+  MUST NOT pass `next_uri` to Arcade — Arcade rejects arbitrary return URIs in
+  both verifier modes. Post-OAuth return is stored per-row via `oauth_return_to`.
+- **Single-project setup (default):** Arcade Dashboard → Auth → User Verifier
+  stays on **Arcade default** (no custom URL). Set `ARCADE_VERIFIER_MODE=arcade`
+  in every environment. Operator email is the Arcade `user_id`.
+- **Multi-project setup (opt-in):** dedicated prod Arcade project with Custom
+  verifier URL `${BETTER_AUTH_URL}/api/arcade/verify`. `/api/arcade/verify` calls
+  `auth.confirmUser` via `lib/arcade/verifier.ts`. Set `ARCADE_VERIFIER_MODE=custom`
+  only in that environment.
 
 ## OAuth UX (Connect / Authorize buttons)
 

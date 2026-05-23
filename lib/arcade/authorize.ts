@@ -7,7 +7,7 @@
  * the intent leaves UNCERTAIN.
  */
 
-import { getArcadeVerifierMode, isArcadeMocked } from '@/lib/env'
+import { isArcadeMocked } from '@/lib/env'
 import { getArcadeClient } from './client'
 import type { ArcadeIdentity } from './identity'
 import { parseFlowIdFromAuthUrl, toArcadeUserId } from './identity'
@@ -65,7 +65,8 @@ export async function authorizeToolkit(input: {
   toolkitName: string
   representativeTool: string
   identity: ArcadeIdentity
-  nextUri?: string
+  /** Stored on the connection row; never sent to Arcade (next_uri is rejected). */
+  returnTo?: string
 }): Promise<ToolkitAuthorizationStatus> {
   if (isMocked()) {
     return {
@@ -77,14 +78,13 @@ export async function authorizeToolkit(input: {
 
   const arcade = getArcadeClient()
   const { toolName, toolVersion } = parseArcadeToolName(input.representativeTool)
-  // Arcade user verifier (local dev) rejects arbitrary next_uri values — omit it.
-  // Custom verifier (production) uses next_uri for post-confirm browser redirect.
-  const nextUri = getArcadeVerifierMode() === 'custom' ? input.nextUri : undefined
+  // Arcade rejects arbitrary next_uri values on tools.authorize (both verifier modes).
+  // Post-OAuth redirect is handled by /api/arcade/verify using oauthReturnTo on the
+  // pending connection row.
   const res = await arcade.tools.authorize({
     tool_name: toolName,
     user_id: toArcadeUserId(input.identity),
     ...(toolVersion ? { tool_version: toolVersion } : {}),
-    ...(nextUri ? { next_uri: nextUri } : {}),
   })
 
   const out: ToolkitAuthorizationStatus = {

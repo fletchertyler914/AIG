@@ -9,7 +9,7 @@
 import { validateConnectionForExecution } from '@/lib/aig/connection-auth'
 import { topologicalSort } from '@/lib/aig/state'
 import { AIGBlockedAuthError } from '@/lib/aig/types'
-import { toolkitFromToolName } from '@/lib/arcade/identity'
+import { resolveArcadeUserIdForConnection, toolkitFromToolName } from '@/lib/arcade/identity'
 import { executeArcadeTool } from '@/lib/arcade/tools'
 import { isWorkspaceMember, resolveConnectionForTool } from '@/lib/db/connection-queries'
 import {
@@ -58,6 +58,7 @@ function callById(calls: ToolCall[]): Map<string, ToolCall> {
 async function assertConnectionAuthorized(input: {
   connection: Awaited<ReturnType<typeof resolveConnectionForTool>>
   approverUserId: string
+  approverEmail: string | null
   workspaceId: string
   toolkitName: string
 }) {
@@ -66,11 +67,27 @@ async function assertConnectionAuthorized(input: {
     userId: input.approverUserId,
   })
 
+  const arcadeUserId =
+    input.connection && input.approverEmail
+      ? resolveArcadeUserIdForConnection({
+          connection: {
+            scope: input.connection.scope,
+            ownerUserId: input.connection.ownerUserId,
+          },
+          operator: {
+            userId: input.approverUserId,
+            email: input.approverEmail,
+            workspaceId: input.workspaceId,
+          },
+        })
+      : undefined
+
   return validateConnectionForExecution({
     connection: input.connection,
     approverUserId: input.approverUserId,
     isWorkspaceMember: isMember,
     toolkitName: input.toolkitName,
+    ...(arcadeUserId ? { arcadeUserId } : {}),
   })
 }
 
@@ -116,6 +133,7 @@ export async function executeApprovedIntent({
       const authorized = await assertConnectionAuthorized({
         connection,
         approverUserId: approvedByUserId,
+        approverEmail: snapshot.intent.approvedBy,
         workspaceId: snapshot.intent.workspaceId,
         toolkitName,
       })

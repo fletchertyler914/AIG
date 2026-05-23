@@ -3,6 +3,7 @@ import { arcadeIdentityForScope } from '@/lib/arcade/identity'
 import { confirmArcadeUser } from '@/lib/arcade/verifier'
 import { requireSession } from '@/lib/auth/session'
 import { clearPendingFlow, getToolkitConnectionByPendingFlow } from '@/lib/db/connection-queries'
+import { resolveOAuthReturnTo } from '@/lib/display/oauth-return'
 import { getPublicAppOrigin, usesArcadeUserVerifier } from '@/lib/env'
 import { logger } from '@/lib/logger'
 
@@ -27,7 +28,14 @@ export async function GET(request: Request) {
   }
 
   if (usesArcadeUserVerifier()) {
-    return redirect(`${appOrigin}/app/connections?error=arcade_verifier_mode`)
+    // Local dev uses Arcade's built-in verifier — this route is not part of the
+    // OAuth loop. Send operators back safely if the Dashboard still points here.
+    return redirect(
+      resolveOAuthReturnTo({
+        appOrigin,
+        fallbackPath: '/app/connections',
+      }),
+    )
   }
 
   try {
@@ -54,7 +62,7 @@ export async function GET(request: Request) {
       return redirect(`${appOrigin}/app/connections?error=user_mismatch`)
     }
 
-    const result = await confirmArcadeUser({ flowId, identity })
+    await confirmArcadeUser({ flowId, identity })
 
     await clearPendingFlow({
       connectionId: binding.id,
@@ -62,7 +70,12 @@ export async function GET(request: Request) {
       connectedAt: Date.now(),
     })
 
-    const destination = result.nextUri ?? `${appOrigin}/app/connections?connected=1`
+    const destination =
+      binding.oauthReturnTo ??
+      resolveOAuthReturnTo({
+        appOrigin,
+        fallbackPath: '/app/connections?connected=1',
+      })
     return redirect(destination)
   } catch (error) {
     log.error({ err: error, flowId }, 'arcade verifier failed')

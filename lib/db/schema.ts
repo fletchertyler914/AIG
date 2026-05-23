@@ -179,6 +179,8 @@ export const toolkitConnections = pgTable(
     arcadeUserId: text('arcade_user_id'),
     /** Latest OAuth flow id while authorization is pending. */
     pendingFlowId: text('pending_flow_id'),
+    /** In-app path to return the operator to after OAuth completes. */
+    oauthReturnTo: text('oauth_return_to'),
     connectedAt: bigint('connected_at', { mode: 'number' }),
     lastCheckedAt: bigint('last_checked_at', { mode: 'number' }),
     createdAt: bigint('created_at', { mode: 'number' })

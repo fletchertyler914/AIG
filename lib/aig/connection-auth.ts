@@ -20,26 +20,29 @@ export function validateConnectionForExecution(input: {
   approverUserId: string
   isWorkspaceMember: boolean
   toolkitName: string
+  /** Runtime-resolved Arcade user id for the active verifier mode. */
+  arcadeUserId?: string
 }): ValidatedConnection {
   const { connection, approverUserId, isWorkspaceMember, toolkitName } = input
+  const resolvedArcadeUserId = input.arcadeUserId ?? connection?.arcadeUserId ?? null
 
-  if (!connection || connection.authStatus !== 'completed' || !connection.arcadeUserId) {
+  if (!connection || connection.authStatus !== 'completed' || !resolvedArcadeUserId) {
     throw new AIGBlockedAuthError(
       approverUserId,
-      connection?.arcadeUserId ?? `no connection for ${toolkitName}`,
+      resolvedArcadeUserId ?? `no connection for ${toolkitName}`,
     )
   }
 
   if (connection.scope === 'personal') {
     if (connection.ownerUserId !== approverUserId) {
-      throw new AIGBlockedAuthError(approverUserId, connection.arcadeUserId)
+      throw new AIGBlockedAuthError(approverUserId, resolvedArcadeUserId)
     }
-    return { ...connection, arcadeUserId: connection.arcadeUserId }
+    return { ...connection, arcadeUserId: resolvedArcadeUserId }
   }
 
   if (!isWorkspaceMember) {
-    throw new AIGBlockedAuthError(approverUserId, connection.arcadeUserId)
+    throw new AIGBlockedAuthError(approverUserId, resolvedArcadeUserId)
   }
 
-  return { ...connection, arcadeUserId: connection.arcadeUserId }
+  return { ...connection, arcadeUserId: resolvedArcadeUserId }
 }

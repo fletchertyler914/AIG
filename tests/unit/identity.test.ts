@@ -3,11 +3,56 @@ import {
   arcadeIdentityForScope,
   parseFlowIdFromAuthUrl,
   personalArcadeIdentity,
+  resolveArcadeUserIdForConnection,
   sharedArcadeIdentity,
   sharedArcadeIdentitySupported,
   toArcadeUserId,
   toolkitFromToolName,
 } from '@/lib/arcade/identity'
+
+describe('resolveArcadeUserIdForConnection', () => {
+  it('uses operator email in arcade verifier mode', () => {
+    expect(
+      resolveArcadeUserIdForConnection({
+        connection: { scope: 'personal', ownerUserId: 'usr_01' },
+        operator: {
+          userId: 'usr_01',
+          email: 'dev@example.com',
+          workspaceId: 'ws_01',
+        },
+        verifierMode: 'arcade',
+      }),
+    ).toBe('dev@example.com')
+  })
+
+  it('uses prefixed user id in custom verifier mode', () => {
+    expect(
+      resolveArcadeUserIdForConnection({
+        connection: { scope: 'personal', ownerUserId: 'usr_01' },
+        operator: {
+          userId: 'usr_01',
+          email: 'dev@example.com',
+          workspaceId: 'ws_01',
+        },
+        verifierMode: 'custom',
+      }),
+    ).toBe('user:usr_01')
+  })
+
+  it('uses workspace id for shared connections', () => {
+    expect(
+      resolveArcadeUserIdForConnection({
+        connection: { scope: 'shared', ownerUserId: null },
+        operator: {
+          userId: 'usr_01',
+          email: 'dev@example.com',
+          workspaceId: 'ws_01',
+        },
+        verifierMode: 'custom',
+      }),
+    ).toBe('workspace:ws_01')
+  })
+})
 
 describe('toArcadeUserId', () => {
   it('uses prefixed user id in custom verifier mode', () => {

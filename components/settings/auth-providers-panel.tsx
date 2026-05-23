@@ -50,15 +50,15 @@ export function AuthProvidersPanel() {
             <p className="max-w-2xl text-muted-foreground text-sm leading-relaxed">
               {data?.verifierMode === 'arcade' ? (
                 <>
-                  Local dev uses Arcade&apos;s built-in user verifier. Sign into arcade.dev with the
-                  same email as AIG — Arcade default OAuth apps work without registering your own
-                  credentials.
+                  Using Arcade&apos;s built-in user verifier. Sign into arcade.dev with the same
+                  email as AIG — Arcade default OAuth apps work without registering your own
+                  credentials. Workspace-scoped connections require custom verifier mode.
                 </>
               ) : (
                 <>
-                  Production uses a custom user verifier. Register your own OAuth apps in Arcade —
-                  one per provider family (Google covers Gmail, Calendar, Drive, etc.). End users
-                  only click Authorize; they never configure OAuth.
+                  Using a custom user verifier. Register your own OAuth apps in Arcade — one per
+                  provider family (Google covers Gmail, Calendar, Drive, etc.). End users only click
+                  Authorize; they never configure OAuth.
                 </>
               )}
             </p>
@@ -86,7 +86,7 @@ export function AuthProvidersPanel() {
             <SetupLink
               href="https://api.arcade.dev/dashboard/auth/settings"
               label="Verifier mode"
-              value="Arcade user verifier (local dev)"
+              value="Arcade user verifier"
             />
           )}
           <SetupLink
@@ -173,9 +173,9 @@ export function AuthProvidersPanel() {
                 <p className="text-muted-foreground leading-relaxed">
                   {data.verifierMode === 'arcade' ? (
                     <>
-                      In local dev, Arcade&apos;s default OAuth apps work once you are signed into
-                      arcade.dev with the same email as AIG. Custom provider registration is only
-                      required for production custom verifier mode.
+                      Arcade&apos;s default OAuth apps work once you are signed into arcade.dev with
+                      the same email as AIG. Custom provider registration is only required for
+                      custom verifier mode (dedicated Arcade project per environment).
                     </>
                   ) : (
                     <>

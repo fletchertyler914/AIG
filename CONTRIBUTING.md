@@ -24,22 +24,31 @@ pnpm dev
 
 ### Arcade OAuth
 
-The verifier mode is environment-aware (`ARCADE_VERIFIER_MODE` in `lib/env.ts`):
+Arcade Dashboard → Auth → User Verifier is a **project-global** setting. A single
+Arcade project cannot point at both localhost and production. Pick one of two
+setups; the code supports both via `ARCADE_VERIFIER_MODE` in `lib/env.ts`.
 
-**Local dev (`arcade` mode, default):** Arcade Dashboard stays on the built-in
-**Arcade user verifier**. Sign into arcade.dev with the same email as AIG and
-default OAuth apps work without further setup. Shared (workspace-scope)
-connections are disabled in this mode.
+**Recommended — single-project (default):**
 
-**Production (`custom` mode, default):**
+- Arcade Dashboard stays on **Arcade user verifier** (no custom URL).
+- Set `ARCADE_VERIFIER_MODE=arcade` in **every** environment (`.env.local` and
+  prod env). Sign into arcade.dev with the same email as AIG and Arcade's
+  default OAuth apps just work.
+- Each operator's email is their Arcade `user_id`. Shared (workspace-scope)
+  connections are disabled in this mode.
 
-1. Arcade Dashboard → Auth → Settings → **Custom verifier**:
-   `${BETTER_AUTH_URL}/api/arcade/verify`
-2. Register your own OAuth apps per **provider family** in Arcade Dashboard
-   (Connected Apps → Add OAuth Provider). One Google app covers Gmail, Calendar,
-   Drive, etc. See **Settings → OAuth providers** in the app for the full catalog
-   and configured status.
-3. Provider setup guides: [Arcade auth providers](https://docs.arcade.dev/en/references/auth-providers)
+**Multi-project — production with BYO OAuth (opt-in):**
+
+Use this only when you maintain **two separate Arcade projects** (dev and prod),
+because the Dashboard verifier URL must be unique per project.
+
+1. Create the prod Arcade project. Arcade Dashboard → Auth → Settings →
+   **Custom verifier**: `${BETTER_AUTH_URL}/api/arcade/verify`.
+2. Register your own OAuth apps per **provider family** (Connected Apps → Add
+   OAuth Provider). One Google app covers Gmail, Calendar, Drive, etc.
+3. Set `ARCADE_VERIFIER_MODE=custom` only in the prod environment and use the
+   prod project's API key there. Keep dev on the single-project setup above
+   with its own API key.
 
 See ADR-0010 (amended) for the full identity contract and the scoped-removal
 flow used when revoking a single toolkit from a multi-toolkit provider grant.

@@ -177,11 +177,12 @@ cp .env.example .env.local
 # Required: DATABASE_URL, ANTHROPIC_API_KEY, ARCADE_API_KEY,
 #   BETTER_AUTH_SECRET, BETTER_AUTH_URL
 # Optional: RESEND_API_KEY (dev magic links log to console if unset)
-# Optional: ARCADE_VERIFIER_MODE=arcade|custom
-#   - `arcade` (dev default) uses Arcade's built-in user verifier and default
-#     OAuth apps. Sign into arcade.dev with the same email as AIG.
-#   - `custom` (prod default) uses /api/arcade/verify and your own OAuth apps
-#     per provider family. Required for multi-user production. See ADR-0010.
+# Required: ARCADE_VERIFIER_MODE=arcade|custom (see ADR-0010)
+#   - `arcade` (recommended single-project default) uses Arcade's built-in user
+#     verifier and default OAuth apps; operator email is the Arcade user_id.
+#     Set in BOTH dev and prod env when you have a single Arcade project.
+#   - `custom` uses /api/arcade/verify and BYO OAuth apps per provider family.
+#     Only valid when you maintain a dedicated Arcade project per environment.
 pnpm db:push
 pnpm dev
 ```

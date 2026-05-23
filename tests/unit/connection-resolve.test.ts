@@ -24,8 +24,21 @@ describe('validateConnectionForExecution', () => {
         approverUserId: 'alice',
         isWorkspaceMember: true,
         toolkitName: 'Gmail',
+        arcadeUserId: 'user:alice',
       }).arcadeUserId,
     ).toBe('user:alice')
+  })
+
+  it('prefers runtime-resolved arcade user id over stored value', () => {
+    expect(
+      validateConnectionForExecution({
+        connection: completedPersonal,
+        approverUserId: 'alice',
+        isWorkspaceMember: true,
+        toolkitName: 'Gmail',
+        arcadeUserId: 'dev@example.com',
+      }).arcadeUserId,
+    ).toBe('dev@example.com')
   })
 
   it('blocks personal connection for a different approver', () => {
