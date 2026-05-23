@@ -49,7 +49,7 @@ export const auth = betterAuth({
       expiresIn: 60 * 15,
       sendMagicLink: async ({ email, url, token }) => {
         try {
-          await sendMagicLinkEmail({ to: email, url, token })
+          await sendMagicLinkEmail({ to: email, url: toConfirmationUrl(url), token })
         } catch (error) {
           logger.error({ err: error, email }, 'magic-link delivery failed')
           throw error
@@ -79,3 +79,16 @@ export const auth = betterAuth({
 })
 
 export type Auth = typeof auth
+
+/**
+ * Rewrite Better Auth's `/api/auth/magic-link/verify?token=...` URL to the
+ * intermediate confirmation page so email link scanners (Gmail Safe Links,
+ * Outlook ATP, etc.) cannot consume the single-use token before the user
+ * clicks. The confirmation page submits the original query params via a form
+ * to the real verify endpoint, requiring real user interaction.
+ */
+function toConfirmationUrl(verifyUrl: string): string {
+  const url = new URL(verifyUrl)
+  url.pathname = '/sign-in/confirm'
+  return url.toString()
+}
