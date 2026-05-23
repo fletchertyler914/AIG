@@ -235,6 +235,7 @@ export async function runPlanAgent(input: PlanAgentInput): Promise<PlanAgentResu
     tools: aiTools,
     stopWhen: stepCountIs(input.maxSteps ?? 6),
     temperature: 0,
+    maxOutputTokens: 2048,
     ...(input.signal ? { abortSignal: input.signal } : {}),
   })
 

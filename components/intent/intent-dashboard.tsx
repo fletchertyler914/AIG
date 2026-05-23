@@ -26,16 +26,27 @@ interface PipelinesResponse {
   pipelines: PipelineDto[]
 }
 
+async function readApiError(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: unknown }
+    if (typeof body.error === 'string' && body.error.length > 0) return body.error
+  } catch {
+    // Fall back to the raw response text below.
+  }
+
+  return res.text()
+}
+
 async function listIntents(): Promise<IntentDto[]> {
   const res = await fetch('/api/intents', { cache: 'no-store' })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw new Error(await readApiError(res))
   const body = (await res.json()) as ListResponse
   return body.intents
 }
 
 async function listPipelines(): Promise<PipelineDto[]> {
   const res = await fetch('/api/pipelines', { cache: 'no-store' })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw new Error(await readApiError(res))
   const body = (await res.json()) as PipelinesResponse
   return body.pipelines
 }
@@ -105,7 +116,7 @@ export function IntentDashboard() {
         body: JSON.stringify({ prompt: trimmed }),
       })
       if (!res.ok) {
-        toast.error(await res.text())
+        toast.error(await readApiError(res))
         return
       }
       const body = (await res.json()) as { intentId: string }
@@ -117,7 +128,7 @@ export function IntentDashboard() {
     startDemo(async () => {
       const res = await fetch('/api/intents/demo', { method: 'POST' })
       if (!res.ok) {
-        toast.error(await res.text())
+        toast.error(await readApiError(res))
         return
       }
       const body = (await res.json()) as { intentId: string }
@@ -132,7 +143,7 @@ export function IntentDashboard() {
         method: 'POST',
       })
       if (!res.ok) {
-        toast.error(await res.text())
+        toast.error(await readApiError(res))
         setPendingPipelineId(null)
         return
       }

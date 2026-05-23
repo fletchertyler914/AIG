@@ -32,13 +32,49 @@ const createIntentSchema = z.object({
 
 const DEFAULT_TOOLKITS = ['Gmail', 'GoogleCalendar'] as const
 
+const PROMPT_TOOLKIT_HINTS: ReadonlyArray<{
+  toolkit: string
+  pattern: RegExp
+}> = [
+  { toolkit: 'Gmail', pattern: /\b(e-?mail|mail|message|inbox|gmail)\b/i },
+  { toolkit: 'GoogleCalendar', pattern: /\b(calendar|reminder|meeting|schedule|invite)\b/i },
+  { toolkit: 'Github', pattern: /\b(github|pull request|pr|issue|repo|branch)\b/i },
+  { toolkit: 'GoogleDocs', pattern: /\b(doc|docs|document|writeup|handoff)\b/i },
+  { toolkit: 'GoogleSheets', pattern: /\b(sheet|sheets|spreadsheet|cell|row|column)\b/i },
+  { toolkit: 'GoogleDrive', pattern: /\b(drive|file|folder|upload|share)\b/i },
+]
+
+function inferRequestedToolkits(prompt: string): string[] {
+  return PROMPT_TOOLKIT_HINTS.filter((hint) => hint.pattern.test(prompt)).map(
+    (hint) => hint.toolkit,
+  )
+}
+
 async function selectToolkits(input: {
   explicit?: string[]
   workspaceId: string
+  prompt: string
 }): Promise<string[]> {
-  if (input.explicit && input.explicit.length > 0) return input.explicit
-
   const enabled = await listEnabledToolkitNames(input.workspaceId)
+  const requested =
+    input.explicit && input.explicit.length > 0
+      ? input.explicit
+      : inferRequestedToolkits(input.prompt)
+
+  if (requested.length > 0) {
+    const enabledSet = new Set(enabled)
+    const missing = requested.filter((toolkit) => !enabledSet.has(toolkit))
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Connect ${missing.join(' and ')} before creating this intent. ` +
+          `Available toolkits in this workspace: ${enabled.length > 0 ? enabled.join(', ') : 'none'}.`,
+      )
+    }
+
+    return requested
+  }
+
   if (enabled.length > 0) return enabled
 
   return Array.from(DEFAULT_TOOLKITS)
@@ -66,6 +102,7 @@ export async function POST(request: Request) {
     const toolkits = await selectToolkits({
       ...(body.toolkits ? { explicit: body.toolkits } : {}),
       workspaceId: ctx.workspace.id,
+      prompt: body.prompt,
     })
 
     log.info(
