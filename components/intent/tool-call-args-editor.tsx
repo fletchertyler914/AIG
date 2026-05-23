@@ -30,7 +30,10 @@ export function ToolCallArgsEditor({
   const [argsText, setArgsText] = useState(prettyJson(toolCall.args))
   const [isPending, setIsPending] = useState(false)
 
-  const formFields = useMemo(() => argsToFields(toolCall.args), [toolCall.args])
+  const formFields = useMemo(
+    () => argsToFields(toolCall.args, { toolName: toolCall.tool }),
+    [toolCall.args, toolCall.tool],
+  )
   const canUseForm = formFields !== null
 
   useEffect(() => {
@@ -164,6 +167,7 @@ export function ToolCallArgsEditor({
               fields={fields}
               editing
               compact={compact}
+              toolName={toolCall.tool}
               onChange={(key, value) => {
                 setFields((current) =>
                   current.map((field) => (field.key === key ? { ...field, value } : field)),
@@ -193,6 +197,7 @@ export function ToolCallArgsEditor({
           <ArgsFormFields
             fields={formFields}
             editing={false}
+            toolName={toolCall.tool}
             onChange={() => {}}
             compact={compact}
           />

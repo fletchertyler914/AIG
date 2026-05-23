@@ -343,7 +343,7 @@ function AddActionForm({
 
       <div className="block space-y-1">
         <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-          Args JSON
+          Arguments
         </span>
         <ToolArgsForm tool={tool} disabled={pending} onArgsChange={onArgsChange} />
       </div>

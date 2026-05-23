@@ -54,7 +54,7 @@ export function ToolArgsForm({ tool, disabled = false, onArgsChange }: ToolArgsF
         return res.json() as Promise<ToolDetailResponse>
       })
       .then((body) => {
-        const nextFields = schemaToFields(body.tool.input)
+        const nextFields = schemaToFields(body.tool.input, { toolName: tool })
         if (nextFields) {
           setFields(nextFields)
           setCanUseForm(true)
@@ -150,6 +150,7 @@ export function ToolArgsForm({ tool, disabled = false, onArgsChange }: ToolArgsF
             fields={fields}
             editing
             compact
+            toolName={tool}
             onChange={(key, value) => {
               setFields((current) =>
                 current.map((field) => (field.key === key ? { ...field, value } : field)),

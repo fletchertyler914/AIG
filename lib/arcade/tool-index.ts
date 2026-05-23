@@ -94,6 +94,12 @@ const MOCK_TOOLS: ToolDefinition[] = [
           value_schema: { val_type: 'datetime' },
         },
         {
+          name: 'calendar_id',
+          description: 'Calendar to create the event in.',
+          required: false,
+          value_schema: { val_type: 'string' },
+        },
+        {
           name: 'attendee_emails',
           description: 'Attendees.',
           required: false,

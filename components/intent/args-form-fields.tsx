@@ -1,5 +1,6 @@
 'use client'
 
+import { EntityPicker } from '@/components/ui/entity-picker'
 import { FieldLabel, Input, Textarea } from '@/components/ui/input'
 import type { ArgField } from '@/lib/display/args-form'
 import { formatArgDisplayValue } from '@/lib/display/args-form'
@@ -10,6 +11,7 @@ interface ArgsFormFieldsProps {
   editing: boolean
   onChange: (key: string, value: ArgField['value']) => void
   compact?: boolean
+  toolName?: string
 }
 
 export function ArgsFormFields({
@@ -17,6 +19,7 @@ export function ArgsFormFields({
   editing,
   onChange,
   compact = false,
+  toolName,
 }: ArgsFormFieldsProps) {
   return (
     <dl className="space-y-3">
@@ -33,6 +36,7 @@ export function ArgsFormFields({
             <ArgFieldInput
               field={field}
               compact={compact}
+              toolName={toolName}
               onChange={(value) => onChange(field.key, value)}
             />
           ) : (
@@ -54,11 +58,26 @@ export function ArgsFormFields({
 interface ArgFieldInputProps {
   field: ArgField
   compact: boolean
+  toolName?: string | undefined
   onChange: (value: ArgField['value']) => void
 }
 
-function ArgFieldInput({ field, compact, onChange }: ArgFieldInputProps) {
+function ArgFieldInput({ field, compact, toolName, onChange }: ArgFieldInputProps) {
   const id = `arg-${field.key}`
+
+  if (field.resolver && toolName && editingSupportsResolver(field)) {
+    return (
+      <EntityPicker
+        id={id}
+        toolName={toolName}
+        parameterName={field.key}
+        resolver={field.resolver}
+        value={String(field.value)}
+        onChange={onChange}
+        compact={compact}
+      />
+    )
+  }
 
   if (field.type === 'boolean') {
     const checked = field.value === true
@@ -146,4 +165,8 @@ function ArgFieldInput({ field, compact, onChange }: ArgFieldInputProps) {
       className={cn(inputType === 'text' ? 'text-sm' : 'font-mono text-xs')}
     />
   )
+}
+
+function editingSupportsResolver(field: ArgField): boolean {
+  return field.type === 'string' || field.type === 'string-list'
 }

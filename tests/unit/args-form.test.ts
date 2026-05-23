@@ -112,6 +112,41 @@ describe('schemaToFields', () => {
       }),
     ).toBeNull()
   })
+
+  it('attaches entity resolver metadata for Google Calendar calendar_id', () => {
+    const fields = schemaToFields(
+      {
+        parameters: [
+          {
+            name: 'calendar_id',
+            required: false,
+            value_schema: { val_type: 'string' },
+          },
+        ],
+      },
+      { toolName: 'GoogleCalendar.CreateEvent@3.3.2' },
+    )
+    expect(fields?.find((field) => field.key === 'calendar_id')?.resolver).toMatchObject({
+      id: 'google-calendar-calendar-id',
+      toolkitName: 'GoogleCalendar',
+    })
+  })
+
+  it('does not attach resolver metadata for unrelated tools', () => {
+    const fields = schemaToFields(
+      {
+        parameters: [
+          {
+            name: 'calendar_id',
+            required: false,
+            value_schema: { val_type: 'string' },
+          },
+        ],
+      },
+      { toolName: 'Gmail.SendEmail@7.0.0' },
+    )
+    expect(fields?.find((field) => field.key === 'calendar_id')?.resolver).toBeUndefined()
+  })
 })
 
 describe('fieldsToArgs', () => {

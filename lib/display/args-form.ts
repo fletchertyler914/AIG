@@ -3,6 +3,8 @@
  * Pure — safe for components and unit tests.
  */
 
+import { type EntityResolverRef, resolveEntityResolverRef } from '@/lib/display/entity-resolvers'
+
 export type ArgFieldType =
   | 'string'
   | 'text'
@@ -24,6 +26,8 @@ export interface ArgField {
   description?: string
   /** Options for select fields. */
   options?: readonly string[]
+  /** When set, UI may load options from a connected toolkit. */
+  resolver?: EntityResolverRef
 }
 
 export interface ArcadeToolInputSchema {
@@ -150,8 +154,15 @@ export function inferFieldType(key: string, value: unknown): ArgFieldType | 'uns
   return 'unsupported'
 }
 
+function attachResolver(field: ArgField, toolName?: string): ArgField {
+  if (!toolName) return field
+  const resolver = resolveEntityResolverRef({ toolName, parameterName: field.key })
+  if (!resolver) return field
+  return { ...field, resolver }
+}
+
 /** Returns labeled fields when args are a flat primitive map; otherwise null → use JSON. */
-export function argsToFields(args: unknown): ArgField[] | null {
+export function argsToFields(args: unknown, options?: { toolName?: string }): ArgField[] | null {
   if (!args || typeof args !== 'object' || Array.isArray(args)) return null
 
   const record = args as Record<string, unknown>
@@ -162,57 +173,87 @@ export function argsToFields(args: unknown): ArgField[] | null {
     if (type === 'unsupported') return null
 
     if (type === 'boolean') {
-      fields.push({ key, label: formatArgFieldLabel(key), type, value: value as boolean })
+      fields.push(
+        attachResolver(
+          { key, label: formatArgFieldLabel(key), type, value: value as boolean },
+          options?.toolName,
+        ),
+      )
       continue
     }
     if (type === 'number') {
-      fields.push({ key, label: formatArgFieldLabel(key), type, value: value as number })
+      fields.push(
+        attachResolver(
+          { key, label: formatArgFieldLabel(key), type, value: value as number },
+          options?.toolName,
+        ),
+      )
       continue
     }
     if (type === 'string-list') {
       const items = Array.isArray(value) ? (value as string[]) : []
-      fields.push({
-        key,
-        label: formatArgFieldLabel(key),
-        type,
-        value: items.join('\n'),
-      })
+      fields.push(
+        attachResolver(
+          {
+            key,
+            label: formatArgFieldLabel(key),
+            type,
+            value: items.join('\n'),
+          },
+          options?.toolName,
+        ),
+      )
       continue
     }
     if (type === 'select') {
-      const options = getSelectOptions(key) ?? [String(value)]
-      fields.push({
-        key,
-        label: formatArgFieldLabel(key),
-        type,
-        value: String(value),
-        options,
-      })
+      const selectOptions = getSelectOptions(key) ?? [String(value)]
+      fields.push(
+        attachResolver(
+          {
+            key,
+            label: formatArgFieldLabel(key),
+            type,
+            value: String(value),
+            options: selectOptions,
+          },
+          options?.toolName,
+        ),
+      )
       continue
     }
     if (type === 'datetime') {
-      fields.push({
-        key,
-        label: formatArgFieldLabel(key),
-        type,
-        value: isoToDatetimeLocalValue(String(value)),
-      })
+      fields.push(
+        attachResolver(
+          {
+            key,
+            label: formatArgFieldLabel(key),
+            type,
+            value: isoToDatetimeLocalValue(String(value)),
+          },
+          options?.toolName,
+        ),
+      )
       continue
     }
 
-    fields.push({
-      key,
-      label: formatArgFieldLabel(key),
-      type,
-      value: String(value ?? ''),
-    })
+    fields.push(
+      attachResolver(
+        {
+          key,
+          label: formatArgFieldLabel(key),
+          type,
+          value: String(value ?? ''),
+        },
+        options?.toolName,
+      ),
+    )
   }
 
   return fields.sort((a, b) => a.key.localeCompare(b.key))
 }
 
 /** Build an empty editable arg form from Arcade's `ToolDefinition.input`. */
-export function schemaToFields(input: unknown): ArgField[] | null {
+export function schemaToFields(input: unknown, options?: { toolName?: string }): ArgField[] | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return []
 
   const schema = input as ArcadeToolInputSchema
@@ -220,7 +261,7 @@ export function schemaToFields(input: unknown): ArgField[] | null {
   const fields: ArgField[] = []
 
   for (const parameter of parameters) {
-    const field = parameterToField(parameter)
+    const field = parameterToField(parameter, options?.toolName)
     if (!field) return null
     fields.push(field)
   }
@@ -230,6 +271,7 @@ export function schemaToFields(input: unknown): ArgField[] | null {
 
 function parameterToField(
   parameter: NonNullable<ArcadeToolInputSchema['parameters']>[number],
+  toolName?: string,
 ): ArgField | null {
   const key = parameter.name
   const valueSchema = parameter.value_schema
@@ -241,37 +283,43 @@ function parameterToField(
   }
   const enumOptions = valueSchema?.enum?.filter((value) => value.length > 0)
   if (enumOptions && enumOptions.length > 0) {
-    return {
-      ...base,
-      type: 'select',
-      value: enumOptions[0] ?? '',
-      options: enumOptions,
-    }
+    return attachResolver(
+      {
+        ...base,
+        type: 'select',
+        value: enumOptions[0] ?? '',
+        options: enumOptions,
+      },
+      toolName,
+    )
   }
 
   const valType = valueSchema?.val_type?.toLowerCase()
   if (!valType || valType === 'string' || valType === 'str') {
     const type = inferFieldType(key, '')
-    return {
-      ...base,
-      type: type === 'unsupported' ? 'string' : type,
-      value: '',
-    }
+    return attachResolver(
+      {
+        ...base,
+        type: type === 'unsupported' ? 'string' : type,
+        value: '',
+      },
+      toolName,
+    )
   }
   if (valType === 'boolean' || valType === 'bool') {
-    return { ...base, type: 'boolean', value: false }
+    return attachResolver({ ...base, type: 'boolean', value: false }, toolName)
   }
   if (valType === 'number' || valType === 'integer' || valType === 'float' || valType === 'int') {
-    return { ...base, type: 'number', value: 0 }
+    return attachResolver({ ...base, type: 'number', value: 0 }, toolName)
   }
   if (valType === 'array' && valueSchema?.inner_val_type?.toLowerCase() === 'string') {
-    return { ...base, type: 'string-list', value: '' }
+    return attachResolver({ ...base, type: 'string-list', value: '' }, toolName)
   }
   if (valType === 'datetime') {
-    return { ...base, type: 'datetime', value: '' }
+    return attachResolver({ ...base, type: 'datetime', value: '' }, toolName)
   }
   if (valType === 'date') {
-    return { ...base, type: 'date', value: '' }
+    return attachResolver({ ...base, type: 'date', value: '' }, toolName)
   }
 
   return null

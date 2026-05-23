@@ -71,7 +71,8 @@ export function ToolCombobox({
         limit: '20',
       })
       const trimmed = query.trim()
-      if (trimmed && !looksLikePattern(trimmed)) params.set('q', trimmed)
+      const searchable = normalizeToolSearchQuery(trimmed)
+      if (searchable) params.set('q', searchable)
 
       fetch(`/api/tools/search?${params.toString()}`, {
         cache: 'no-store',
@@ -252,6 +253,6 @@ export function ToolCombobox({
   )
 }
 
-function looksLikePattern(value: string): boolean {
-  return value.includes('*')
+function normalizeToolSearchQuery(value: string): string {
+  return value.replace(/\*/g, '').replace(/\.$/, '').trim()
 }
