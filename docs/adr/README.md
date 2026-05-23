@@ -12,6 +12,7 @@ auth, connections, or the intent lifecycle.
 | [0005](0005-co-authorship-trace-as-hero.md) | Co-authorship trace as primary artifact | Accepted |
 | [0009](0009-control-plane-architecture.md) | Control plane: Better Auth, workspaces, connections | Accepted (amended for approval-policy foundation) |
 | [0010](0010-arcade-custom-verifier-and-connection-scope.md) | Custom Arcade verifier + personal/shared connections | Accepted (amended for dev/prod mode + scoped removal) |
+| [0011](0011-saas-tenancy-and-byo-arcade.md) | SaaS tenancy + BYO Arcade (north star) | Proposed |
 
 ## When to add an ADR
 

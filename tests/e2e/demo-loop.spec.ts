@@ -28,7 +28,7 @@ test.describe('AIG demo loop', () => {
     const label = page.getByTestId('intent-label')
     await expect(label).toContainText(/lead follow-up/i)
 
-    await expect(page.getByTestId('intent-status')).toHaveText('PENDING_REVIEW')
+    await expect(page.getByTestId('intent-status')).toHaveText('PENDING REVIEW')
     await expect(page.getByText('Locked objective:')).toBeVisible()
 
     await page.getByTestId('view-list').click()
@@ -57,7 +57,7 @@ test.describe('AIG demo loop', () => {
       page.locator('[data-testid="trace-entry"][data-event-type="agent_regenerated"]'),
     ).toBeVisible()
 
-    await expect(page.getByTestId('intent-status')).toHaveText('PENDING_REVIEW', {
+    await expect(page.getByTestId('intent-status')).toHaveText('PENDING REVIEW', {
       timeout: 15_000,
     })
 

@@ -257,6 +257,20 @@ Better Auth `member` rows and create/remove pending `invitation` rows.
 
 ---
 
+## SaaS north star (proposed, not in flight)
+
+See [docs/adr/0011-saas-tenancy-and-byo-arcade.md](docs/adr/0011-saas-tenancy-and-byo-arcade.md)
+for the target multi-tenant SaaS architecture (BYO Arcade per workspace,
+envelope-encrypted secrets, Postgres RLS, Stripe entitlements, public REST
+API, SSO/SCIM for enterprise).
+
+Validation work happens **before** committing to that build — see
+[docs/saas-validation.md](docs/saas-validation.md) for the demo plan,
+design-partner experiments, pricing tests, and the decision points that
+trigger each ADR-0011 phase.
+
+---
+
 ## Explicitly out of scope (ADR-0009 §8)
 
 Do not build without a new ADR:

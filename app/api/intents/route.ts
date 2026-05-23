@@ -2,6 +2,11 @@ import { z } from 'zod'
 import { createLlmLabeler } from '@/lib/ai/labeler'
 import { runPlanAgent } from '@/lib/ai/plan-agent'
 import { formCandidateIntent, statusForConfidence } from '@/lib/aig/formation'
+import {
+  formatMissingToolkitsError,
+  inferRequestedToolkits,
+  missingRequestedToolkits,
+} from '@/lib/aig/toolkit-preflight'
 import type { IntentStatus } from '@/lib/aig/types'
 import { jsonError, jsonOk, messageFromUnknown, parseJson } from '@/lib/api/http'
 import { authorizeMany, hasPendingAuthorizations } from '@/lib/arcade/authorize'
@@ -32,24 +37,6 @@ const createIntentSchema = z.object({
 
 const DEFAULT_TOOLKITS = ['Gmail', 'GoogleCalendar'] as const
 
-const PROMPT_TOOLKIT_HINTS: ReadonlyArray<{
-  toolkit: string
-  pattern: RegExp
-}> = [
-  { toolkit: 'Gmail', pattern: /\b(e-?mail|mail|message|inbox|gmail)\b/i },
-  { toolkit: 'GoogleCalendar', pattern: /\b(calendar|reminder|meeting|schedule|invite)\b/i },
-  { toolkit: 'Github', pattern: /\b(github|pull request|pr|issue|repo|branch)\b/i },
-  { toolkit: 'GoogleDocs', pattern: /\b(doc|docs|document|writeup|handoff)\b/i },
-  { toolkit: 'GoogleSheets', pattern: /\b(sheet|sheets|spreadsheet|cell|row|column)\b/i },
-  { toolkit: 'GoogleDrive', pattern: /\b(drive|file|folder|upload|share)\b/i },
-]
-
-function inferRequestedToolkits(prompt: string): string[] {
-  return PROMPT_TOOLKIT_HINTS.filter((hint) => hint.pattern.test(prompt)).map(
-    (hint) => hint.toolkit,
-  )
-}
-
 async function selectToolkits(input: {
   explicit?: string[]
   workspaceId: string
@@ -62,14 +49,10 @@ async function selectToolkits(input: {
       : inferRequestedToolkits(input.prompt)
 
   if (requested.length > 0) {
-    const enabledSet = new Set(enabled)
-    const missing = requested.filter((toolkit) => !enabledSet.has(toolkit))
+    const missing = missingRequestedToolkits({ requested, enabled })
 
     if (missing.length > 0) {
-      throw new Error(
-        `Connect ${missing.join(' and ')} before creating this intent. ` +
-          `Available toolkits in this workspace: ${enabled.length > 0 ? enabled.join(', ') : 'none'}.`,
-      )
+      throw new Error(formatMissingToolkitsError({ missing, enabled }))
     }
 
     return requested

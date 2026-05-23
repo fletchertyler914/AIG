@@ -291,7 +291,6 @@ export async function resetConnectionAfterRevoke(
       authUrl: null,
       pendingFlowId: null,
       connectedAt: null,
-      enabled: false,
       lastCheckedAt: now,
       updatedAt: now,
     })

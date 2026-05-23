@@ -16,6 +16,9 @@ export async function signInWithMagicLink(page: import('@playwright/test').Page)
   expect(res.ok()).toBeTruthy()
   const body = (await res.json()) as { url: string }
   await page.goto(body.url)
+  if (new URL(body.url).pathname === '/sign-in/confirm') {
+    await page.getByTestId('magic-link-confirm-submit').click()
+  }
   await page.waitForURL(/\/app/)
 }
 
