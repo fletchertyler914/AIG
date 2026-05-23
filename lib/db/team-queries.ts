@@ -21,6 +21,8 @@ export interface TeamInvitationRow {
   createdAt: Date
 }
 
+export type TeamInviteRole = 'member' | 'reviewer' | 'admin'
+
 export async function listTeamMembers(organizationId: string): Promise<TeamMemberRow[]> {
   return db
     .select({
@@ -55,7 +57,7 @@ export async function listTeamInvitations(organizationId: string): Promise<TeamI
 export async function createTeamInvitation(input: {
   organizationId: string
   email: string
-  role: 'member' | 'admin'
+  role: TeamInviteRole
   inviterId: string
 }): Promise<TeamInvitationRow> {
   const now = new Date()

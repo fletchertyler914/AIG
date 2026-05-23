@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 
 const inviteSchema = z.object({
   email: z.email(),
-  role: z.enum(['member', 'admin']).default('member'),
+  role: z.enum(['member', 'reviewer', 'admin']).default('member'),
 })
 
 export interface TeamResponseDto {

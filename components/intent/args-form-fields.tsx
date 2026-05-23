@@ -24,7 +24,11 @@ export function ArgsFormFields({
         <div key={field.key} className="space-y-1.5">
           <FieldLabel htmlFor={`arg-${field.key}`} className="text-muted-foreground text-xs">
             {field.label}
+            {field.required ? <span className="text-primary"> *</span> : null}
           </FieldLabel>
+          {editing && field.description ? (
+            <p className="text-[11px] text-muted-foreground leading-relaxed">{field.description}</p>
+          ) : null}
           {editing ? (
             <ArgFieldInput
               field={field}

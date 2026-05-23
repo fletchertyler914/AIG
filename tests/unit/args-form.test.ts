@@ -6,6 +6,7 @@ import {
   formatArgFieldLabel,
   inferFieldType,
   isoToDatetimeLocalValue,
+  schemaToFields,
 } from '@/lib/display/args-form'
 
 describe('formatArgFieldLabel', () => {
@@ -66,6 +67,50 @@ describe('argsToFields', () => {
 
   it('returns null for nested args', () => {
     expect(argsToFields({ meta: { nested: true } })).toBeNull()
+  })
+})
+
+describe('schemaToFields', () => {
+  it('builds empty fields from Arcade tool input parameters', () => {
+    const fields = schemaToFields({
+      parameters: [
+        {
+          name: 'recipient',
+          required: true,
+          description: 'Email recipient.',
+          value_schema: { val_type: 'string' },
+        },
+        {
+          name: 'content_type',
+          value_schema: { val_type: 'string', enum: ['plain', 'html'] },
+        },
+        {
+          name: 'attendee_emails',
+          value_schema: { val_type: 'array', inner_val_type: 'string' },
+        },
+      ],
+    })
+
+    expect(fields).not.toBeNull()
+    expect(fields?.find((f) => f.key === 'recipient')).toMatchObject({
+      type: 'email',
+      required: true,
+      description: 'Email recipient.',
+    })
+    expect(fields?.find((f) => f.key === 'content_type')).toMatchObject({
+      type: 'select',
+      options: ['plain', 'html'],
+      value: 'plain',
+    })
+    expect(fields?.find((f) => f.key === 'attendee_emails')?.type).toBe('string-list')
+  })
+
+  it('returns null for unsupported complex parameter types', () => {
+    expect(
+      schemaToFields({
+        parameters: [{ name: 'payload', value_schema: { val_type: 'object' } }],
+      }),
+    ).toBeNull()
   })
 })
 

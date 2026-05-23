@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canApprovePolicyMatchedIntent,
   canApproveRestrictedIntent,
   evaluateApprovalPolicies,
   toolPatternMatches,
@@ -14,9 +15,11 @@ describe('toolPatternMatches', () => {
 })
 
 describe('canApproveRestrictedIntent', () => {
-  it('allows owners and admins', () => {
+  it('allows owners, admins, and reviewers', () => {
     expect(canApproveRestrictedIntent('owner')).toBe(true)
     expect(canApproveRestrictedIntent('admin')).toBe(true)
+    expect(canApproveRestrictedIntent('reviewer')).toBe(true)
+    expect(canApprovePolicyMatchedIntent('reviewer')).toBe(true)
     expect(canApproveRestrictedIntent('member')).toBe(false)
   })
 })
@@ -29,7 +32,7 @@ describe('evaluateApprovalPolicies', () => {
     },
   ]
 
-  it('requires owner/admin for restricted matching policies', () => {
+  it('requires owner/admin/reviewer for restricted matching policies', () => {
     const decision = evaluateApprovalPolicies({
       approverRole: 'member',
       toolCalls,
@@ -50,12 +53,12 @@ describe('evaluateApprovalPolicies', () => {
     })
 
     expect(decision.ok).toBe(false)
-    expect(decision.error).toContain('requires an owner or admin')
+    expect(decision.error).toContain('requires an owner, admin, or reviewer')
   })
 
-  it('allows owner/admin through restricted matching policies', () => {
+  it('allows owner/admin/reviewer through restricted matching policies', () => {
     const decision = evaluateApprovalPolicies({
-      approverRole: 'admin',
+      approverRole: 'reviewer',
       toolCalls,
       policies: [
         {

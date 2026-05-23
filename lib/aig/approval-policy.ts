@@ -36,8 +36,12 @@ export interface ApprovalPolicyDecision {
   error?: string
 }
 
+export function canApprovePolicyMatchedIntent(role: string | null): boolean {
+  return role === 'owner' || role === 'admin' || role === 'reviewer'
+}
+
 export function canApproveRestrictedIntent(role: string | null): boolean {
-  return role === 'owner' || role === 'admin'
+  return canApprovePolicyMatchedIntent(role)
 }
 
 export function evaluateApprovalPolicies(input: {
@@ -76,11 +80,11 @@ export function evaluateApprovalPolicies(input: {
   }
 
   const restricted = matchedRules.find((rule) => rule.action === 'require_admin_approval')
-  if (restricted && !canApproveRestrictedIntent(input.approverRole)) {
+  if (restricted && !canApprovePolicyMatchedIntent(input.approverRole)) {
     return {
       ok: false,
       matchedRules,
-      error: `Policy "${restricted.policyName}" requires an owner or admin to approve ${restricted.tool}.`,
+      error: `Policy "${restricted.policyName}" requires an owner, admin, or reviewer to approve ${restricted.tool}.`,
     }
   }
 

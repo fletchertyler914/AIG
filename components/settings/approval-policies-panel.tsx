@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ToolCombobox } from '@/components/ui/tool-combobox'
 
 async function fetchPolicies(): Promise<ApprovalPoliciesResponseDto> {
   const res = await fetch('/api/approval-policies', { cache: 'no-store' })
@@ -113,7 +114,7 @@ export function ApprovalPoliciesPanel() {
               <h2 className="font-semibold text-lg tracking-tight">Tool approval gates</h2>
               <p className="max-w-2xl text-muted-foreground text-sm leading-relaxed">
                 Match Arcade tool names with wildcard patterns. Policies run before approval: either
-                require an owner/admin approver or block approval entirely.
+                require a reviewer/admin/owner approver or block approval entirely.
               </p>
             </div>
             <Badge variant={canManage ? 'success' : 'outline'}>
@@ -134,17 +135,17 @@ export function ApprovalPoliciesPanel() {
                   className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-ring"
                 />
               </label>
-              <label className="space-y-1">
+              <div className="space-y-1">
                 <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
                   Tool pattern
                 </span>
-                <input
+                <ToolCombobox
+                  mode="pattern"
                   value={pattern}
-                  onChange={(event) => setPattern(event.target.value)}
+                  onChange={setPattern}
                   placeholder="Gmail.*"
-                  className="h-9 w-full rounded-md border border-border bg-background px-3 font-mono text-sm outline-none focus:border-ring"
                 />
-              </label>
+              </div>
               <label className="space-y-1">
                 <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
                   Action
@@ -156,7 +157,7 @@ export function ApprovalPoliciesPanel() {
                   }
                   className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-ring"
                 >
-                  <option value="require_admin_approval">Require owner/admin</option>
+                  <option value="require_admin_approval">Require reviewer+</option>
                   <option value="block">Block approval</option>
                 </select>
               </label>
@@ -236,7 +237,7 @@ export function ApprovalPoliciesPanel() {
 
 function formatAction(action: 'require_admin_approval' | 'block'): string {
   if (action === 'block') return 'Block approval'
-  return 'Require owner/admin'
+  return 'Require reviewer+'
 }
 
 function DeletePolicyDialog({

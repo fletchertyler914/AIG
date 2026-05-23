@@ -215,6 +215,69 @@ export async function upsertToolkitConnection(input: {
   return row
 }
 
+/**
+ * Ensure the workspace has an enabled connection row for the given toolkit so
+ * planning can include it in the tool schema. Never mutates `authStatus` —
+ * the existing AUTH REQUIRED affordance handles OAuth at approve time.
+ *
+ * Returns the row when the toolkit was found (either via an existing row or
+ * via the provided catalog lookup) and `null` when the toolkit cannot be
+ * resolved against Arcade.
+ */
+export async function ensureToolkitConnectionForPlanning(input: {
+  workspaceId: string
+  ownerUserId: string | null
+  toolkitName: string
+  arcadeUserId: string
+  lookupCatalog: () => Promise<ToolkitCatalogEntry | null>
+}): Promise<ToolkitConnection | null> {
+  const personal = await getToolkitConnection({
+    workspaceId: input.workspaceId,
+    toolkitName: input.toolkitName,
+    scope: 'personal',
+    ownerUserId: input.ownerUserId,
+  })
+
+  if (personal) {
+    if (personal.enabled) return personal
+    return setToolkitConnectionEnabled({
+      workspaceId: input.workspaceId,
+      toolkitName: input.toolkitName,
+      scope: 'personal',
+      ownerUserId: input.ownerUserId,
+      enabled: true,
+    })
+  }
+
+  const shared = await getToolkitConnection({
+    workspaceId: input.workspaceId,
+    toolkitName: input.toolkitName,
+    scope: 'shared',
+  })
+
+  if (shared) {
+    if (shared.enabled) return shared
+    return setToolkitConnectionEnabled({
+      workspaceId: input.workspaceId,
+      toolkitName: input.toolkitName,
+      scope: 'shared',
+      enabled: true,
+    })
+  }
+
+  const catalogEntry = await input.lookupCatalog()
+  if (!catalogEntry) return null
+
+  return upsertToolkitConnection({
+    workspaceId: input.workspaceId,
+    catalogEntry,
+    scope: 'personal',
+    ownerUserId: input.ownerUserId,
+    enabled: true,
+    arcadeUserId: input.arcadeUserId,
+  })
+}
+
 export async function setToolkitConnectionEnabled(input: {
   workspaceId: string
   toolkitName: string

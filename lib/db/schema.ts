@@ -114,6 +114,8 @@ export const approvalPolicyActionEnum = pgEnum('approval_policy_action', [
   'block',
 ])
 
+export const policyDecisionOutcomeEnum = pgEnum('policy_decision_outcome', ['allowed', 'blocked'])
+
 // ── Tenancy extensions ───────────────────────────────────────────────────────
 
 /**
@@ -452,6 +454,41 @@ export const approvalPolicyRules = pgTable(
   ],
 )
 
+/**
+ * Append-only workspace audit for approval-policy evaluations. Mutations remain
+ * the per-intent trace; this table supports workspace-level filtering/export,
+ * including denied attempts that never create a `human_approved` mutation.
+ */
+export const policyDecisions = pgTable(
+  'policy_decisions',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    intentId: text('intent_id')
+      .notNull()
+      .references(() => intents.id, { onDelete: 'cascade' }),
+    approverUserId: text('approver_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    approverEmail: text('approver_email'),
+    approverRole: text('approver_role'),
+    decision: policyDecisionOutcomeEnum('decision').notNull(),
+    reason: text('reason'),
+    matchedRules: jsonb('matched_rules').notNull().default(sql`'[]'::jsonb`),
+    createdAt: bigint('created_at', { mode: 'number' })
+      .notNull()
+      .default(sql`(extract(epoch from now()) * 1000)::bigint`),
+  },
+  (t) => [
+    index('policy_decisions_workspace_created_idx').on(t.workspaceId, t.createdAt),
+    index('policy_decisions_workspace_decision_idx').on(t.workspaceId, t.decision),
+    index('policy_decisions_intent_idx').on(t.intentId),
+    index('policy_decisions_approver_idx').on(t.approverUserId),
+  ],
+)
+
 // ── Inferred types ───────────────────────────────────────────────────────────
 
 export type Workspace = typeof workspaces.$inferSelect
@@ -483,3 +520,7 @@ export type NewApprovalPolicy = typeof approvalPolicies.$inferInsert
 export type ApprovalPolicyRule = typeof approvalPolicyRules.$inferSelect
 export type NewApprovalPolicyRule = typeof approvalPolicyRules.$inferInsert
 export type ApprovalPolicyAction = (typeof approvalPolicyActionEnum.enumValues)[number]
+
+export type PolicyDecision = typeof policyDecisions.$inferSelect
+export type NewPolicyDecision = typeof policyDecisions.$inferInsert
+export type PolicyDecisionOutcome = (typeof policyDecisionOutcomeEnum.enumValues)[number]

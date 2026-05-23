@@ -25,7 +25,7 @@ async function fetchTeam(): Promise<TeamResponseDto> {
 export function TeamPanel() {
   const [data, setData] = useState<TeamResponseDto | null>(null)
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'member' | 'admin'>('member')
+  const [role, setRole] = useState<'member' | 'reviewer' | 'admin'>('member')
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; email: string } | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -89,8 +89,8 @@ export function TeamPanel() {
               </p>
               <h2 className="font-semibold text-lg tracking-tight">Workspace members</h2>
               <p className="max-w-2xl text-muted-foreground text-sm leading-relaxed">
-                Owner/admin members can manage shared connections and approval policies. Invitations
-                are tracked in Better Auth&apos;s organization tables.
+                Reviewers can approve policy-gated intents. Owner/admin members can manage shared
+                connections, approval policies, and invitations.
               </p>
             </div>
             <Badge variant={canManage ? 'success' : 'outline'}>
@@ -117,10 +117,13 @@ export function TeamPanel() {
                 </span>
                 <select
                   value={role}
-                  onChange={(event) => setRole(event.target.value as 'member' | 'admin')}
+                  onChange={(event) =>
+                    setRole(event.target.value as 'member' | 'reviewer' | 'admin')
+                  }
                   className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-ring"
                 >
                   <option value="member">Member</option>
+                  <option value="reviewer">Reviewer</option>
                   <option value="admin">Admin</option>
                 </select>
               </label>
@@ -154,7 +157,9 @@ export function TeamPanel() {
                 </div>
                 <Badge
                   variant={
-                    member.role === 'owner' || member.role === 'admin' ? 'success' : 'outline'
+                    member.role === 'owner' || member.role === 'admin' || member.role === 'reviewer'
+                      ? 'success'
+                      : 'outline'
                   }
                 >
                   {member.role}

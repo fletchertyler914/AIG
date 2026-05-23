@@ -1,13 +1,15 @@
 'use client'
 
 import { ExternalLink, Plus, ShieldAlert } from 'lucide-react'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
+import { ToolArgsForm } from '@/components/intent/tool-args-form'
 import { ToolCallArgsEditor } from '@/components/intent/tool-call-args-editor'
 import type { ToolCallDto } from '@/components/intent/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ToolCombobox } from '@/components/ui/tool-combobox'
 import {
   formatToolActionTitle,
   formatToolDisplayName,
@@ -244,7 +246,7 @@ function AddActionForm({
   onDone: () => void
 }) {
   const [tool, setTool] = useState('')
-  const [argsJson, setArgsJson] = useState('{\n  \n}')
+  const [args, setArgs] = useState<Record<string, unknown> | null>({})
   const [afterToolCallId, setAfterToolCallId] = useState(selected?.id ?? '')
   const [reason, setReason] = useState('')
   const [pending, startTransition] = useTransition()
@@ -256,20 +258,12 @@ function AddActionForm({
   const addAction = () => {
     const trimmedTool = tool.trim()
     if (!trimmedTool) {
-      toast.error('Enter an Arcade tool name first.')
+      toast.error('Choose an Arcade tool first.')
       return
     }
 
-    let args: Record<string, unknown>
-    try {
-      const parsed = JSON.parse(argsJson) as unknown
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        toast.error('Args must be a JSON object.')
-        return
-      }
-      args = parsed as Record<string, unknown>
-    } catch {
-      toast.error('Args must be valid JSON.')
+    if (args === null) {
+      toast.error('Args must be a valid JSON object.')
       return
     }
 
@@ -291,12 +285,16 @@ function AddActionForm({
       }
       toast.success('Action added — downstream graph repaired.')
       setTool('')
-      setArgsJson('{\n  \n}')
+      setArgs({})
       setReason('')
       await onChanged()
       onDone()
     })
   }
+
+  const onArgsChange = useCallback((nextArgs: Record<string, unknown> | null) => {
+    setArgs(nextArgs)
+  }, [])
 
   return (
     <div className="space-y-4">
@@ -310,18 +308,19 @@ function AddActionForm({
         </p>
       </div>
 
-      <label className="block space-y-1">
+      <div className="block space-y-1">
         <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
           Tool
         </span>
-        <input
-          className="h-9 w-full rounded-md border border-border bg-background px-3 font-mono text-sm outline-none focus:border-ring"
+        <ToolCombobox
+          mode="tool"
           disabled={pending}
-          onChange={(event) => setTool(event.target.value)}
+          onChange={setTool}
           placeholder="Gmail.SendEmail@7.0.0"
+          data-testid="add-action-tool"
           value={tool}
         />
-      </label>
+      </div>
 
       <label className="block space-y-1">
         <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
@@ -342,17 +341,12 @@ function AddActionForm({
         </select>
       </label>
 
-      <label className="block space-y-1">
+      <div className="block space-y-1">
         <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
           Args JSON
         </span>
-        <textarea
-          className="min-h-32 w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-ring"
-          disabled={pending}
-          onChange={(event) => setArgsJson(event.target.value)}
-          value={argsJson}
-        />
-      </label>
+        <ToolArgsForm tool={tool} disabled={pending} onArgsChange={onArgsChange} />
+      </div>
 
       <label className="block space-y-1">
         <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">

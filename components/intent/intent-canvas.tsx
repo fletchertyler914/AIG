@@ -32,7 +32,7 @@ interface DagLayout {
 
 function layoutDag(toolCalls: ToolCallDto[]): DagLayout {
   const g = new dagre.graphlib.Graph()
-  g.setGraph({ rankdir: 'TB', nodesep: 48, ranksep: 64, marginx: 32, marginy: 32 })
+  g.setGraph({ rankdir: 'TB', nodesep: 56, ranksep: 72, marginx: 24, marginy: 24 })
   g.setDefaultEdgeLabel(() => ({}))
 
   for (const tc of toolCalls) {
@@ -99,7 +99,7 @@ export function IntentCanvas({
 
   if (toolCalls.length === 0) {
     return (
-      <div className="grid-bg flex min-h-[280px] flex-1 items-center justify-center rounded-md border border-border bg-surface-1 p-8">
+      <div className="grid-bg flex min-h-[440px] flex-1 items-center justify-center rounded-md border border-border bg-surface-1 p-8">
         <div className="max-w-sm rounded-md border border-border bg-card px-6 py-8 text-center shadow-arcade">
           <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
             Empty graph
@@ -113,16 +113,16 @@ export function IntentCanvas({
   return (
     <div
       className={cn(
-        'grid-bg relative min-h-[320px] flex-1 overflow-auto rounded-md border border-border bg-surface-1',
+        'grid-bg relative flex min-h-[440px] flex-1 overflow-auto rounded-md border border-border bg-surface-1',
         disabled && 'pointer-events-none opacity-50',
       )}
     >
       <svg
         width={layout.width}
         height={layout.height}
-        className="min-w-full"
         role="img"
         aria-label="Intent dependency graph"
+        className="m-auto block shrink-0"
       >
         <defs>
           <marker id="dag-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">

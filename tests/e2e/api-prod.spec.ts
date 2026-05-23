@@ -43,4 +43,30 @@ test.describe('production build smoke', () => {
     expect(text, 'must not surface ENOENT from bundling').not.toMatch(/ENOENT|no such file/i)
     expect(res.status(), `body: ${text}`).toBeLessThan(500)
   })
+
+  test('POST /api/intents accepts prompts that imply unconnected toolkits', async ({ request }) => {
+    // Regression: AIG is plan-before-execute, so missing OAuth (or even
+    // missing workspace-level enablement) must NOT block intent creation.
+    // The plan agent auto-enables inferred toolkits and the resulting
+    // intent renders AUTH REQUIRED per tool-call node. The pre-fix code
+    // returned a 400 "Connect Gmail and GoogleCalendar before creating
+    // this intent." — this test ensures we never re-introduce that gate.
+    const res = await request.post('/api/intents', {
+      data: {
+        prompt:
+          'Email a concise AIG launch update to demo@example.com and create a 15-minute calendar reminder for tomorrow at 9am.',
+      },
+    })
+    const text = await res.text()
+
+    expect(text, 'must not require pre-auth at planning time').not.toMatch(
+      /Connect .* before creating this intent/i,
+    )
+    expect(res.status(), `body: ${text}`).toBeLessThan(500)
+
+    if (res.status() === 201) {
+      const body = (await res.json()) as { intentId: string; toolCallIds: string[] }
+      expect(body.intentId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/)
+    }
+  })
 })

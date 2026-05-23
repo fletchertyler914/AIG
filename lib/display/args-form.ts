@@ -20,8 +20,23 @@ export interface ArgField {
   label: string
   type: ArgFieldType
   value: string | boolean | number
+  required?: boolean
+  description?: string
   /** Options for select fields. */
   options?: readonly string[]
+}
+
+export interface ArcadeToolInputSchema {
+  parameters?: Array<{
+    name: string
+    description?: string
+    required?: boolean
+    value_schema?: {
+      val_type?: string
+      inner_val_type?: string
+      enum?: string[]
+    }
+  }>
 }
 
 const ISO_DATETIME_RX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/
@@ -194,6 +209,72 @@ export function argsToFields(args: unknown): ArgField[] | null {
   }
 
   return fields.sort((a, b) => a.key.localeCompare(b.key))
+}
+
+/** Build an empty editable arg form from Arcade's `ToolDefinition.input`. */
+export function schemaToFields(input: unknown): ArgField[] | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return []
+
+  const schema = input as ArcadeToolInputSchema
+  const parameters = schema.parameters ?? []
+  const fields: ArgField[] = []
+
+  for (const parameter of parameters) {
+    const field = parameterToField(parameter)
+    if (!field) return null
+    fields.push(field)
+  }
+
+  return fields.sort((a, b) => a.key.localeCompare(b.key))
+}
+
+function parameterToField(
+  parameter: NonNullable<ArcadeToolInputSchema['parameters']>[number],
+): ArgField | null {
+  const key = parameter.name
+  const valueSchema = parameter.value_schema
+  const base = {
+    key,
+    label: formatArgFieldLabel(key),
+    required: parameter.required ?? false,
+    ...(parameter.description ? { description: parameter.description } : {}),
+  }
+  const enumOptions = valueSchema?.enum?.filter((value) => value.length > 0)
+  if (enumOptions && enumOptions.length > 0) {
+    return {
+      ...base,
+      type: 'select',
+      value: enumOptions[0] ?? '',
+      options: enumOptions,
+    }
+  }
+
+  const valType = valueSchema?.val_type?.toLowerCase()
+  if (!valType || valType === 'string' || valType === 'str') {
+    const type = inferFieldType(key, '')
+    return {
+      ...base,
+      type: type === 'unsupported' ? 'string' : type,
+      value: '',
+    }
+  }
+  if (valType === 'boolean' || valType === 'bool') {
+    return { ...base, type: 'boolean', value: false }
+  }
+  if (valType === 'number' || valType === 'integer' || valType === 'float' || valType === 'int') {
+    return { ...base, type: 'number', value: 0 }
+  }
+  if (valType === 'array' && valueSchema?.inner_val_type?.toLowerCase() === 'string') {
+    return { ...base, type: 'string-list', value: '' }
+  }
+  if (valType === 'datetime') {
+    return { ...base, type: 'datetime', value: '' }
+  }
+  if (valType === 'date') {
+    return { ...base, type: 'date', value: '' }
+  }
+
+  return null
 }
 
 export function fieldsToArgs(

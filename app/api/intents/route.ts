@@ -2,17 +2,17 @@ import { z } from 'zod'
 import { createLlmLabeler } from '@/lib/ai/labeler'
 import { runPlanAgent } from '@/lib/ai/plan-agent'
 import { formCandidateIntent, statusForConfidence } from '@/lib/aig/formation'
-import {
-  formatMissingToolkitsError,
-  inferRequestedToolkits,
-  missingRequestedToolkits,
-} from '@/lib/aig/toolkit-preflight'
+import { planSelectToolkits } from '@/lib/aig/toolkit-preflight'
 import type { IntentStatus } from '@/lib/aig/types'
 import { jsonError, jsonOk, messageFromUnknown, parseJson } from '@/lib/api/http'
 import { authorizeMany, hasPendingAuthorizations } from '@/lib/arcade/authorize'
-import { personalArcadeIdentity } from '@/lib/arcade/identity'
+import { getArcadeToolkitCatalogEntry } from '@/lib/arcade/catalog'
+import { personalArcadeIdentity, toArcadeUserId } from '@/lib/arcade/identity'
 import { resolveWorkspaceContext } from '@/lib/auth/session'
-import { listEnabledToolkitNames } from '@/lib/db/connection-queries'
+import {
+  ensureToolkitConnectionForPlanning,
+  listEnabledToolkitNames,
+} from '@/lib/db/connection-queries'
 import { type CreateIntentInput, createIntent, listRecentIntents } from '@/lib/db/queries'
 import { env } from '@/lib/env'
 import { logger } from '@/lib/logger'
@@ -35,32 +35,28 @@ const createIntentSchema = z.object({
   maxSteps: z.number().int().min(1).max(16).optional(),
 })
 
-const DEFAULT_TOOLKITS = ['Gmail', 'GoogleCalendar'] as const
-
-async function selectToolkits(input: {
-  explicit?: string[]
+function buildPlanSelectDeps(input: {
   workspaceId: string
-  prompt: string
-}): Promise<string[]> {
-  const enabled = await listEnabledToolkitNames(input.workspaceId)
-  const requested =
-    input.explicit && input.explicit.length > 0
-      ? input.explicit
-      : inferRequestedToolkits(input.prompt)
-
-  if (requested.length > 0) {
-    const missing = missingRequestedToolkits({ requested, enabled })
-
-    if (missing.length > 0) {
-      throw new Error(formatMissingToolkitsError({ missing, enabled }))
-    }
-
-    return requested
+  ownerUserId: string | null
+  arcadeUserId: string
+}) {
+  return {
+    listEnabled: () => listEnabledToolkitNames(input.workspaceId),
+    ensureToolkit: async (toolkitName: string) => {
+      const ensured = await ensureToolkitConnectionForPlanning({
+        workspaceId: input.workspaceId,
+        ownerUserId: input.ownerUserId,
+        toolkitName,
+        arcadeUserId: input.arcadeUserId,
+        lookupCatalog: () =>
+          getArcadeToolkitCatalogEntry({
+            arcadeUserId: input.arcadeUserId,
+            toolkitName,
+          }),
+      })
+      return { resolved: ensured !== null }
+    },
   }
-
-  if (enabled.length > 0) return enabled
-
-  return Array.from(DEFAULT_TOOLKITS)
 }
 
 export async function GET() {
@@ -82,10 +78,14 @@ export async function POST(request: Request) {
       ctx.email || env.DEMO_USER_ID,
     )
     const planUserId = ctx.email || env.DEMO_USER_ID
-    const toolkits = await selectToolkits({
-      ...(body.toolkits ? { explicit: body.toolkits } : {}),
-      workspaceId: ctx.workspace.id,
+    const toolkits = await planSelectToolkits({
       prompt: body.prompt,
+      ...(body.toolkits ? { explicit: body.toolkits } : {}),
+      deps: buildPlanSelectDeps({
+        workspaceId: ctx.workspace.id,
+        ownerUserId: ctx.userId === 'anonymous' ? null : ctx.userId,
+        arcadeUserId: toArcadeUserId(arcadeIdentity),
+      }),
     })
 
     log.info(

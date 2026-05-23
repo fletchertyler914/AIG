@@ -4,6 +4,7 @@ import { executeApprovedIntent } from '@/lib/aig/executor'
 import { jsonError, jsonOk, messageFromUnknown, parseJson } from '@/lib/api/http'
 import { requireSession, resolveWorkspaceContext } from '@/lib/auth/session'
 import { listApprovalPoliciesForWorkspace } from '@/lib/db/approval-policy-queries'
+import { recordPolicyDecision } from '@/lib/db/audit-queries'
 import { appendMutation, getIntentWithTrace, markIntentApproved } from '@/lib/db/queries'
 import { isE2eAuthSkipped } from '@/lib/env'
 import { logger } from '@/lib/logger'
@@ -53,11 +54,36 @@ export async function POST(request: Request, context: RouteContext) {
       approverRole: ctx.memberRole,
     })
     if (!policyDecision.ok) {
+      if (policyDecision.matchedRules.length > 0) {
+        await recordPolicyDecision({
+          workspaceId: ctx.workspace.id,
+          intentId: id,
+          approverUserId: approvedByUserId,
+          approverEmail: approvedBy,
+          approverRole: ctx.memberRole,
+          decision: 'blocked',
+          reason: policyDecision.error ?? 'Approval blocked by workspace policy',
+          matchedRules: policyDecision.matchedRules,
+        })
+      }
       return jsonError(policyDecision.error ?? 'Approval blocked by workspace policy', 403)
     }
 
     const approved = await markIntentApproved(id, approvedBy, approvedByUserId)
     if (!approved) return jsonError('Intent not found', 404)
+
+    if (policyDecision.matchedRules.length > 0) {
+      await recordPolicyDecision({
+        workspaceId: ctx.workspace.id,
+        intentId: id,
+        approverUserId: approvedByUserId,
+        approverEmail: approvedBy,
+        approverRole: ctx.memberRole,
+        decision: 'allowed',
+        reason: null,
+        matchedRules: policyDecision.matchedRules,
+      })
+    }
 
     await appendMutation({
       intentId: id,
