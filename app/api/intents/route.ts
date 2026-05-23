@@ -58,7 +58,10 @@ export async function POST(request: Request) {
   try {
     const body = parseJson(createIntentSchema, await request.json())
     const ctx = await resolveWorkspaceContext()
-    const arcadeIdentity = personalArcadeIdentity(ctx.userId === 'anonymous' ? 'demo' : ctx.userId)
+    const arcadeIdentity = personalArcadeIdentity(
+      ctx.userId === 'anonymous' ? 'demo' : ctx.userId,
+      ctx.email || env.DEMO_USER_ID,
+    )
     const planUserId = ctx.email || env.DEMO_USER_ID
     const toolkits = await selectToolkits({
       ...(body.toolkits ? { explicit: body.toolkits } : {}),
@@ -111,6 +114,7 @@ export async function POST(request: Request) {
         ...candidate.impact,
         ...(pendingAuths.length > 0 ? { pendingAuthorizations: pendingAuths } : {}),
         ...(plan.text ? { agentSummary: plan.text } : {}),
+        ...(ctx.email ? { arcadeOperatorEmail: ctx.email } : {}),
       },
       confidence: candidate.confidence,
       expireAtMs: Date.now() + 5 * 60_000,

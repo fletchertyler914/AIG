@@ -43,6 +43,17 @@ export const env = createEnv({
     E2E_SKIP_AUTH: z
       .union([z.literal('1'), z.literal('0'), z.literal('true'), z.literal('false')])
       .optional(),
+    /** Capture magic-link URLs for Playwright sign-in tests. */
+    E2E_CAPTURE_MAGIC_LINK: z
+      .union([z.literal('1'), z.literal('0'), z.literal('true'), z.literal('false')])
+      .optional(),
+    /**
+     * Arcade user verification mode:
+     * - `arcade` — Arcade.dev user verifier (local dev default). Personal OAuth
+     *   uses operator email as Arcade user_id; Arcade default OAuth apps work.
+     * - `custom` — AIG custom verifier + prefixed user IDs (production default).
+     */
+    ARCADE_VERIFIER_MODE: z.enum(['arcade', 'custom']).optional(),
   },
   client: {},
   runtimeEnv: {
@@ -62,6 +73,8 @@ export const env = createEnv({
     DEMO_USE_SLACK: process.env['DEMO_USE_SLACK'],
     E2E_MOCK_ARCADE: process.env['E2E_MOCK_ARCADE'],
     E2E_SKIP_AUTH: process.env['E2E_SKIP_AUTH'],
+    E2E_CAPTURE_MAGIC_LINK: process.env['E2E_CAPTURE_MAGIC_LINK'],
+    ARCADE_VERIFIER_MODE: process.env['ARCADE_VERIFIER_MODE'],
   },
   skipValidation:
     process.env['SKIP_ENV_VALIDATION'] === '1' || process.env['npm_lifecycle_event'] === 'lint',
@@ -73,4 +86,19 @@ export const isTest = env.NODE_ENV === 'test'
 export const isDevelopment = env.NODE_ENV === 'development'
 export const isArcadeMocked = env.E2E_MOCK_ARCADE === '1' || env.E2E_MOCK_ARCADE === 'true'
 export const isE2eAuthSkipped = env.E2E_SKIP_AUTH === '1' || env.E2E_SKIP_AUTH === 'true'
+export const isE2eCaptureMagicLink =
+  env.E2E_CAPTURE_MAGIC_LINK === '1' || env.E2E_CAPTURE_MAGIC_LINK === 'true'
+
+export type ArcadeVerifierMode = 'arcade' | 'custom'
+
+/** Resolved verifier mode — defaults to arcade in dev, custom in production/test. */
+export function getArcadeVerifierMode(): ArcadeVerifierMode {
+  if (env.ARCADE_VERIFIER_MODE) return env.ARCADE_VERIFIER_MODE
+  if (isProduction || isTest) return 'custom'
+  return 'arcade'
+}
+
+export function usesArcadeUserVerifier(): boolean {
+  return getArcadeVerifierMode() === 'arcade'
+}
 export const isDemoSlackEnabled = env.DEMO_USE_SLACK === '1' || env.DEMO_USE_SLACK === 'true'

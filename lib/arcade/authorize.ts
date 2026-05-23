@@ -7,7 +7,7 @@
  * the intent leaves UNCERTAIN.
  */
 
-import { isArcadeMocked } from '@/lib/env'
+import { getArcadeVerifierMode, isArcadeMocked } from '@/lib/env'
 import { getArcadeClient } from './client'
 import type { ArcadeIdentity } from './identity'
 import { parseFlowIdFromAuthUrl, toArcadeUserId } from './identity'
@@ -77,11 +77,14 @@ export async function authorizeToolkit(input: {
 
   const arcade = getArcadeClient()
   const { toolName, toolVersion } = parseArcadeToolName(input.representativeTool)
+  // Arcade user verifier (local dev) rejects arbitrary next_uri values — omit it.
+  // Custom verifier (production) uses next_uri for post-confirm browser redirect.
+  const nextUri = getArcadeVerifierMode() === 'custom' ? input.nextUri : undefined
   const res = await arcade.tools.authorize({
     tool_name: toolName,
     user_id: toArcadeUserId(input.identity),
     ...(toolVersion ? { tool_version: toolVersion } : {}),
-    ...(input.nextUri ? { next_uri: input.nextUri } : {}),
+    ...(nextUri ? { next_uri: nextUri } : {}),
   })
 
   const out: ToolkitAuthorizationStatus = {
@@ -141,4 +144,51 @@ export function hasPendingAuthorizations(
   statuses: ReadonlyArray<ToolAuthorizationStatus>,
 ): boolean {
   return statuses.some((s) => s.status !== 'completed')
+}
+
+/**
+ * Result of attempting to revoke a user's Arcade auth connection for a provider.
+ * `connectionId` is the Arcade-side connection deleted, if any.
+ */
+export interface RevokeUserConnectionResult {
+  /** True when at least one matching Arcade connection was deleted. */
+  revoked: boolean
+  /** Arcade-side connection ids that were deleted (usually 0 or 1). */
+  connectionIds: string[]
+}
+
+/**
+ * Revoke a user's OAuth connection at Arcade for the given provider.
+ *
+ * Uses Arcade's admin `userConnections` API: list by (user_id, provider_id),
+ * then delete each match. Idempotent — returns `revoked: false` when no
+ * matching connection exists.
+ */
+export async function revokeUserConnection(input: {
+  identity: ArcadeIdentity
+  providerId: string
+}): Promise<RevokeUserConnectionResult> {
+  if (isMocked()) return { revoked: true, connectionIds: [] }
+
+  const arcade = getArcadeClient()
+  const userId = toArcadeUserId(input.identity)
+  const matches: string[] = []
+  const providerIds = input.providerId.startsWith('arcade-')
+    ? [input.providerId]
+    : [input.providerId, `arcade-${input.providerId}`]
+
+  for (const providerId of providerIds) {
+    for await (const conn of arcade.admin.userConnections.list({
+      user_id: userId,
+      provider_id: providerId,
+    })) {
+      const id = conn.id ?? conn.connection_id
+      if (id) matches.push(id)
+    }
+    if (matches.length > 0) break
+  }
+
+  await Promise.all(matches.map((id) => arcade.admin.userConnections.delete(id)))
+
+  return { revoked: matches.length > 0, connectionIds: matches }
 }

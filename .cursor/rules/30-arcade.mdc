@@ -25,18 +25,51 @@ See ADR-0010. Prefer SDK over hand-rolled HTTP (also `AGENTS.md` §3a).
 - Singleton client via `lib/arcade/client.ts`. App-level cache + inflight dedup
   is allowed; reimplementing wire protocol is not.
 
-## Identity (non-negotiable)
+## Identity (non-negotiable in production)
 
-- All Arcade `user_id` values go through `lib/arcade/identity.ts`:
-  - personal → `user:{betterAuthUserId}`
-  - shared → `workspace:{workspaceId}`
-- Never pass `session.user.email` as Arcade `user_id`.
+- All Arcade `user_id` values go through `lib/arcade/identity.ts`.
+- **`ARCADE_VERIFIER_MODE=custom`** (production default): personal →
+  `user:{betterAuthUserId}`, shared → `workspace:{workspaceId}`. Never pass raw
+  email as Arcade `user_id` in this mode.
+- **`ARCADE_VERIFIER_MODE=arcade`** (local dev default): personal OAuth uses the
+  operator email so Arcade's built-in user verifier matches the arcade.dev session.
+  Shared connections are disabled — they require custom verifier.
 
 ## OAuth & verifier
 
 - Start OAuth via `lib/arcade/authorize.ts` (`tools.authorize`).
-- Custom verifier at `/api/arcade/verify` calls `auth.confirmUser` via
-  `lib/arcade/verifier.ts`. Dashboard URL: `${BETTER_AUTH_URL}/api/arcade/verify`.
+- **Production:** Custom verifier at `/api/arcade/verify` calls `auth.confirmUser`
+  via `lib/arcade/verifier.ts`. Dashboard URL: `${BETTER_AUTH_URL}/api/arcade/verify`.
+- **Local dev:** Keep Arcade Dashboard on **Arcade user verifier**; sign into
+  arcade.dev with the same email as AIG. Arcade default OAuth apps work without
+  BYO credentials. `authorizeToolkit` MUST omit `next_uri` in `arcade` mode —
+  Arcade's user verifier rejects arbitrary return URIs.
+
+## OAuth UX (Connect / Authorize buttons)
+
+- Open the auth URL in a **new tab** via `window.open(url, '_blank')`. Do not
+  redirect the current tab — the user loses unsaved state and the parent never
+  observes completion.
+- Listeners on `visibilitychange` + `focus` flag an awaiting-auth `useRef` and
+  trigger a single `GET /api/connections` (or intent fetch) on return. Reference
+  implementations: `components/connections/connections-client.tsx`,
+  `components/intent/intent-side-panel.tsx`.
+- `GET /api/connections` calls `syncPendingConnections` to re-check Arcade for
+  `pending` / `unknown` rows and mark them `completed` if the grant is live.
+  Do not duplicate this scan in components.
+
+## Scoped revocation
+
+- OAuth scopes are granted at the **provider** level, not the toolkit level. To
+  "remove one toolkit" without nuking the rest of a provider family:
+  1. `revokeUserConnection()` (calls `admin.userConnections.list` + `.delete`)
+     to drop the provider grant.
+  2. `resetConnectionAfterRevoke()` on the removed toolkit row.
+  3. Re-`tools.authorize` each other toolkit sharing that provider; if any
+     comes back with an `auth_url`, return it as `reauthorizeUrl` so the UI
+     reopens OAuth for the user.
+- Provider family is normalized via `providerFamily()` (handles `arcade-*`
+  prefixes). Reference: `app/api/connections/[toolkit]/route.ts` DELETE handler.
 
 ## Connections & execution
 
@@ -54,6 +87,8 @@ See ADR-0010. Prefer SDK over hand-rolled HTTP (also `AGENTS.md` §3a).
   Do not hand-wrap tool schemas.
 - Connections page: curated list via parallel `tools.list({ toolkit })`; full
   search index via paginated `tools.list({ user_id })` with 30-min cache.
+- Admin operations (provider revoke, provider list) go through
+  `client.admin.*` — never raw HTTP.
 
 ## Security & testing
 

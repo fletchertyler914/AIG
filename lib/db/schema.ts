@@ -358,6 +358,44 @@ export const executionRecords = pgTable(
   (t) => [index('exec_intent_idx').on(t.intentId)],
 )
 
+/**
+ * A versioned template promoted from a completed (or review-ready) intent run.
+ * `template` stores the tool DAG with positional dependencies for re-runs.
+ */
+export const pipelines = pgTable(
+  'pipelines',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    /** Intent this template was promoted from (nullable if source deleted). */
+    sourceIntentId: text('source_intent_id').references(() => intents.id, {
+      onDelete: 'set null',
+    }),
+    version: integer('version').notNull().default(1),
+    objective: text('objective').notNull(),
+    systems: text('systems').array().notNull().default(sql`'{}'::text[]`),
+    template: jsonb('template').notNull(),
+    createdByUserId: text('created_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: bigint('created_at', { mode: 'number' })
+      .notNull()
+      .default(sql`(extract(epoch from now()) * 1000)::bigint`),
+    updatedAt: bigint('updated_at', { mode: 'number' })
+      .notNull()
+      .default(sql`(extract(epoch from now()) * 1000)::bigint`),
+  },
+  (t) => [
+    uniqueIndex('pipelines_workspace_name_version_uq').on(t.workspaceId, t.name, t.version),
+    index('pipelines_workspace_idx').on(t.workspaceId),
+    index('pipelines_source_intent_idx').on(t.sourceIntentId),
+  ],
+)
+
 // ── Inferred types ───────────────────────────────────────────────────────────
 
 export type Workspace = typeof workspaces.$inferSelect
@@ -380,3 +418,6 @@ export type NewMutation = typeof mutations.$inferInsert
 
 export type ExecutionRecord = typeof executionRecords.$inferSelect
 export type NewExecutionRecord = typeof executionRecords.$inferInsert
+
+export type Pipeline = typeof pipelines.$inferSelect
+export type NewPipeline = typeof pipelines.$inferInsert

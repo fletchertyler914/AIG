@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import type { IntentDto } from '@/components/intent/types'
-import { IntentStatusBadge } from '@/components/ui/badge'
+import { IntentDisplayBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Container } from '@/components/ui/container'
@@ -216,7 +216,11 @@ export function IntentDashboard() {
                         <h3 className="truncate font-medium text-foreground text-sm">
                           {intent.label}
                         </h3>
-                        <IntentStatusBadge status={intent.status} />
+                        <IntentDisplayBadge
+                          status={intent.status}
+                          confidence={intent.confidence}
+                          impact={intent.impact}
+                        />
                       </div>
                       <p className="mt-1 line-clamp-1 text-muted-foreground text-sm">
                         {intent.description}

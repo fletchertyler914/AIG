@@ -59,7 +59,9 @@ app/                    HTTP + UI layer. Only place that constructs Response obj
   └── api/              Route handlers. Validate input with zod, return typed JSON.
   └── app/              Authenticated control plane (RSC + client islands).
 components/             UI primitives + composed components. No data fetching.
-  └── ui/               shadcn primitives — never edited manually except theming.
+  └── ui/               shadcn-style primitives — Button, Card, Dialog, etc.
+                        Use Dialog (Radix) for ALL modals/confirmations.
+                        Never use window.confirm/alert/prompt.
 lib/aig/                PURE DOMAIN. No fetch, no fs, no env, no DB, no Arcade.
   ├── state.ts          Intent lifecycle state machine.
   ├── formation.ts      Window + DAG construction.
@@ -99,8 +101,12 @@ lib/ai/                 ONLY place that imports `ai` or `@ai-sdk/*`.
   ├── plan-agent.ts
   └── labeler.ts
 lib/api/                Shared HTTP helpers (jsonOk, parseJson, …).
-lib/env.ts              ONLY place that reads process.env.
+lib/env.ts              ONLY place that reads process.env. Also resolves
+                        ARCADE_VERIFIER_MODE (arcade in dev, custom in prod).
 lib/logger.ts           ONLY place that imports `pino`.
+proxy.ts                Next 16 proxy (was `middleware.ts`). Session-cookie
+                        gate for /app/**. Edge runtime — reads process.env
+                        directly for E2E_SKIP_AUTH.
 eval/                   Repair eval harness. Imports lib/aig/* and mocks the rest.
 tests/                  unit/ (vitest), integration/, e2e/ (playwright).
 scripts/                One-off ops scripts. Run with `tsx`.
@@ -154,10 +160,14 @@ Cursor rule: `.cursor/rules/40-auth-tenancy.mdc`.
 Toolkit OAuth is stored in `toolkit_connections` with scope `personal` or
 `shared` (ADR-0010):
 
-| Scope | Arcade `user_id` | Who manages |
-| ----- | ---------------- | ----------- |
-| personal | `user:{userId}` | The signed-in user |
-| shared | `workspace:{workspaceId}` | Org owner/admin only |
+| Mode | Personal `user_id` | Shared `user_id` | Default |
+| ---- | ------------------ | ---------------- | ------- |
+| `custom` | `user:{betterAuthUserId}` | `workspace:{workspaceId}` | production |
+| `arcade` | operator email | not supported | local dev |
+
+Set with `ARCADE_VERIFIER_MODE`. Custom mode requires the verifier route + BYO
+OAuth credentials in Arcade Dashboard. Arcade mode uses Arcade's built-in user
+verifier and Arcade default OAuth apps.
 
 At execution, `resolveConnectionForTool()` picks personal → shared → blocked.
 Pure validation lives in `lib/aig/connection-auth.ts`.
@@ -165,6 +175,18 @@ Pure validation lives in `lib/aig/connection-auth.ts`.
 Connections UI/API: `app/api/connections/`, `components/connections/`.
 Catalog: curated default + full-index search via SDK `tools.list` pagination
 (`lib/arcade/catalog.ts`).
+
+OAuth UX invariants:
+- **New tab.** Clicking Connect / Authorize opens OAuth in `window.open(_, '_blank')`,
+  not a same-tab redirect. The current page refreshes on `visibilitychange` or
+  `focus` so stale `pending` rows resolve without manual reload.
+- **Sync on read.** `GET /api/connections` re-checks Arcade (`tools.authorize`)
+  for any non-`completed`/`failed` row and flips them to `completed` when Arcade
+  reports the grant covers their scopes.
+- **Scoped removal.** OAuth tokens are per-provider, not per-toolkit. Removing one
+  toolkit revokes the provider grant (`admin.userConnections.delete`) then
+  immediately re-authorizes the remaining same-provider toolkits so the user only
+  loses scopes for the removed toolkit.
 
 ---
 
@@ -274,6 +296,15 @@ These qualities are explicit project goals. Cursor enforces a subset via
 - **Append-only audit** — never mutate historical mutations or co-authorship rows.
 - **Conventional commits** with scoped messages (see §7).
 - Comments explain *why* and link to ADRs/discussions — not *what* the code does.
+
+### UI conventions
+
+- **Modals + confirmations** use `components/ui/dialog.tsx` (Radix). Never
+  `window.confirm` / `window.alert` / `window.prompt`.
+- **Destructive actions** use the `destructive` button variant inside a Dialog,
+  with the active label switching to a `…` progress state while pending.
+- **Toasts** (`sonner`) for non-blocking success/error feedback. They are not
+  a substitute for confirmation dialogs.
 
 ### Quality gates
 

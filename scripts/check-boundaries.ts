@@ -75,7 +75,7 @@ function resolveAlias(importSource: string): string | null {
 
 const PROCESS_ENV_ALLOWED = new Set([
   'lib/env.ts',
-  'middleware.ts',
+  'proxy.ts',
   'playwright.config.ts',
   'vitest.config.ts',
   'drizzle.config.ts',

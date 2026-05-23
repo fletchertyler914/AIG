@@ -29,7 +29,10 @@ function hadPendingAuthorizations(impact: Record<string, unknown>): boolean {
 }
 
 function arcadeIdentityForIntent(intent: Intent) {
-  return personalArcadeIdentity(intent.createdByUserId ?? 'anonymous')
+  const impact = asRecord(intent.impact)
+  const email =
+    typeof impact['arcadeOperatorEmail'] === 'string' ? impact['arcadeOperatorEmail'] : undefined
+  return personalArcadeIdentity(intent.createdByUserId ?? 'anonymous', email)
 }
 
 /** Stable fingerprint for SSE change detection (not just mutation count). */

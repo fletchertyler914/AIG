@@ -38,6 +38,20 @@ Read `AGENTS.md` §9 for rationale. These rules apply to every change.
 - **ADR before architecture shifts** — stack pins, module boundaries, new product
   surfaces from `AGENTS.md` §8.
 
+## UI conventions
+
+- **No native browser dialogs.** `window.confirm`, `window.alert`, and
+  `window.prompt` are forbidden in `components/**` and `app/**`. Use
+  `components/ui/dialog.tsx` (Radix) for any modal, confirmation, or
+  destructive-action gate.
+- **Destructive actions** use the `destructive` button variant inside a Dialog
+  and switch to a pending label (e.g. `Removing…`) while the request is in flight.
+- **Toasts** (`sonner`) are for non-blocking success/error feedback, not a
+  substitute for confirmation dialogs.
+- **OAuth handoff** opens in a new tab (`window.open(_, '_blank')`) with a
+  visibility/focus listener to refresh state on return. Never redirect the
+  current tab into Arcade OAuth.
+
 ## Testing
 
 - State machine transitions → `tests/unit/state.test.ts`.
@@ -48,5 +62,6 @@ Read `AGENTS.md` §9 for rationale. These rules apply to every change.
 ## Security
 
 - Secrets only in `lib/env.ts`. Log redaction via `lib/logger.ts`.
-- Never pass raw email as Arcade `user_id` (see ADR-0010).
+- Never pass raw email as Arcade `user_id` in **custom** verifier mode (see ADR-0010).
+  Local dev (`ARCADE_VERIFIER_MODE=arcade`) intentionally uses operator email.
 - Shared toolkit OAuth gated by `canManageSharedConnections()`.

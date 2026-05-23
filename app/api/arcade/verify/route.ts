@@ -3,7 +3,7 @@ import { arcadeIdentityForScope } from '@/lib/arcade/identity'
 import { confirmArcadeUser } from '@/lib/arcade/verifier'
 import { requireSession } from '@/lib/auth/session'
 import { clearPendingFlow, getToolkitConnectionByPendingFlow } from '@/lib/db/connection-queries'
-import { env } from '@/lib/env'
+import { env, usesArcadeUserVerifier } from '@/lib/env'
 import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +25,10 @@ export async function GET(request: Request) {
     return redirect(`${env.BETTER_AUTH_URL}/app/connections?error=missing_flow_id`)
   }
 
+  if (usesArcadeUserVerifier()) {
+    return redirect(`${env.BETTER_AUTH_URL}/app/connections?error=arcade_verifier_mode`)
+  }
+
   try {
     const session = await requireSession()
     const binding = await getToolkitConnectionByPendingFlow(flowId)
@@ -38,6 +42,7 @@ export async function GET(request: Request) {
       scope: binding.scope,
       userId: session.user.id,
       workspaceId: binding.workspaceId,
+      email: session.user.email,
     })
 
     if (binding.scope === 'personal' && binding.ownerUserId !== session.user.id) {

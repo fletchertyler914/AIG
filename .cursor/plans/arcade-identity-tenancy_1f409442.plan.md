@@ -1,19 +1,19 @@
 ---
 name: aig-control-plane-roadmap
 overview: >-
-  Control-plane delivery roadmap for AIG. Phase 1 (Arcade identity + scoped connections)
-  and Phase 2 (intent UI + live auth sync) landed in WIP commit e143d3a. Phase 3+ follows
-  ADR-0009 sprint sequence.
+  Control-plane delivery roadmap for AIG. Phases 1, 2, 4, and 6 are shipped on the
+  current branch (1 ahead of origin/main + uncommitted polish). Pending phases:
+  production cutover, approval policies, remaining product gaps.
 todos:
-  # ── Phase 1: Arcade identity + connections (DONE — e143d3a) ──────────────
+  # ── Phase 1: Arcade identity + connections (DONE) ────────────────────────
   - id: adr
-    content: ADR-0010 + amend ADR-0009 + cursor rules 30/40/45
+    content: ADR-0009/0010 + cursor rules 00/30/40/45 + AGENTS.md
     status: completed
   - id: verifier
     content: Custom verifier via auth.confirmUser — lib/arcade/verifier.ts, app/api/arcade/verify/route.ts
     status: completed
   - id: identity
-    content: lib/arcade/identity.ts chokepoint — user:{id} / workspace:{id}, no email as user_id
+    content: lib/arcade/identity.ts chokepoint — branches on ARCADE_VERIFIER_MODE (arcade=email / custom=user:{id}+workspace:{id})
     status: completed
   - id: migration
     content: Drizzle migration 0001_connection_scope — scope, owner_user_id, arcade_user_id, partial uniques
@@ -28,9 +28,9 @@ todos:
     content: Provider catalog + admin readiness panel (Settings) + Connections badges via admin.authProviders.list
     status: completed
   - id: tests-p1
-    content: Unit tests — verifier, identity, connection-resolve, authorize, boundaries (128 passing)
+    content: Unit tests — verifier, identity, connection-resolve, authorize, boundaries
     status: completed
-  # ── Phase 2: Intent UI + auth UX (DONE — e143d3a) ───────────────────────
+  # ── Phase 2: Intent UI + auth UX (DONE) ──────────────────────────────────
   - id: intent-ui
     content: Modern-retro tokens, intent canvas (dagre DAG), side panel, trace drawer, args form
     status: completed
@@ -38,101 +38,100 @@ todos:
     content: lib/intent/authorization-sync.ts + SSE fingerprint + intent Authorize via POST /api/connections
     status: completed
   - id: app-shell
-    content: /app layout, sidebar, header, landing, sign-in, middleware session gate
+    content: /app layout, sidebar, header, landing, sign-in, proxy.ts session gate (Next 16)
     status: completed
-  # ── Phase 3: Production OAuth unblock (MANUAL + small code) ─────────────
-  - id: dashboard-oauth
-    content: 'MANUAL — Arcade Dashboard: Custom verifier URL + Google OAuth credentials (see Settings panel)'
-    status: pending
+  # ── Phase 3 — Polish + dev/prod verifier (DONE) ──────────────────────────
+  - id: verifier-mode
+    content: ARCADE_VERIFIER_MODE env (arcade in dev, custom in prod) — lib/env.ts + identity.ts + authorize.ts
+    status: completed
+  - id: dialog-primitive
+    content: components/ui/dialog.tsx Radix Dialog; removed all window.confirm usage
+    status: completed
+  - id: oauth-newtab
+    content: Connect/Authorize buttons open OAuth in new tab; visibilitychange/focus auto-refresh
+    status: completed
+  - id: connections-sync
+    content: syncPendingConnections re-checks Arcade on GET /api/connections to flip pending→completed
+    status: completed
+  - id: scoped-removal
+    content: DELETE /api/connections/[toolkit] revokes provider grant then re-authorizes remaining same-provider toolkits
+    status: completed
   - id: e2e-auth
-    content: Playwright magic-link sign-in path (replace E2E_SKIP_AUTH where feasible)
-    status: pending
-  # ── Phase 4: Pipelines (Sprint 3 — ADR-0009) ────────────────────────────
+    content: Playwright magic-link capture + /api/test/magic-link + fixtures/auth.ts
+    status: completed
+  # ── Phase 4: Pipelines (DONE) ────────────────────────────────────────────
   - id: pipeline-model
-    content: Pipeline schema — versioned template promoted from a completed intent/run
-    status: pending
+    content: Pipeline schema migration 0002, lib/aig/pipeline.ts, lib/db/pipeline-queries.ts
+    status: completed
   - id: pipeline-ui
-    content: Replace /app/pipelines placeholder with list + promote-from-run flow
-    status: pending
-  # ── Phase 5: Approval policies (Sprint 4) ───────────────────────────────
-  - id: policies
-    content: Per-tool-pattern approval rules, reviewer roles, team invites in Settings
-    status: pending
-  # ── Phase 6: Insights + polish (Sprint 5) ───────────────────────────────
+    content: Pipelines API, registry UI, Save as pipeline + Run pipeline on intent detail
+    status: completed
+  # ── Phase 5: Insights + UNCERTAIN split (DONE) ───────────────────────────
   - id: insights
-    content: /app/insights — audit analytics, connection health, run metrics
+    content: /app/insights workspace stats API + dashboard
+    status: completed
+  - id: uncertain-split
+    content: Split UNCERTAIN UI — AUTH REQUIRED vs LOW CONFIDENCE badges
+    status: completed
+  # ── Phase 6: Production cutover (PENDING) ────────────────────────────────
+  - id: dashboard-oauth
+    content: 'MANUAL — Arcade Dashboard: switch to custom verifier + Google OAuth credentials for prod tenant'
     status: pending
-  - id: product-gaps
-    content: Add-action/replan API, split UNCERTAIN vs auth-pending UI, pipeline-first creation
+  - id: prod-cutover
+    content: 'Set ARCADE_VERIFIER_MODE=custom in Vercel; push branch; live E2E against prod tenant'
+    status: pending
+  # ── Phase 7: Approval policies (PENDING) ─────────────────────────────────
+  - id: policies
+    content: Per-tool-pattern approval rules, reviewer roles beyond owner/admin, team invites in Settings
+    status: pending
+  # ── Phase 8: Remaining product gaps (PENDING) ────────────────────────────
+  - id: add-action
+    content: Add-action / replan API + UI from intent detail
+    status: pending
+  - id: pipeline-first-create
+    content: Pipeline-first creation entry on dashboard (template chooser, not only freeform prompt)
     status: pending
 isProject: true
 ---
 
 # AIG control plane roadmap
 
-**WIP commit:** `e143d3a` — `chore: WIP checkpoint — control plane, intent UI, and Arcade OAuth`
-
-Branch is ahead of `origin/main` by 1 commit (not pushed).
+**Branch state:** 1 commit ahead of `origin/main` (`479ab91` last roadmap refresh),
+plus a substantial uncommitted polish round documented under Phase 3 below.
 
 ---
 
 ## Phase 1 — Arcade identity + scoped connections ✅
 
-### Problem (solved)
-
-AIG previously passed `session.user.email` as Arcade `user_id`, and Arcade's default verifier
-required a matching arcade.dev browser session — causing `user_mismatch` when AIG email ≠
-arcade.dev email, and blocking workspace-shared toolkits.
-
-### End state (shipped)
+### End state
 
 ```mermaid
 flowchart LR
     BA["Better Auth session"] --> Verify["/api/arcade/verify"]
     Verify --> Confirm["auth.confirmUser(flow_id, user_id)"]
     Confirm --> Arcade["Arcade OAuth complete"]
-    Id["lib/arcade/identity.ts"] -->|"personal: user:{userId}"| AuthZ["tools.authorize"]
-    Id -->|"shared: workspace:{workspaceId}"| AuthZ
+    Id["lib/arcade/identity.ts<br/>(branches on ARCADE_VERIFIER_MODE)"]
+    Id -->|"arcade mode → operator email"| AuthZ["tools.authorize"]
+    Id -->|"custom personal → user:{userId}"| AuthZ
+    Id -->|"custom shared → workspace:{workspaceId}"| AuthZ
     AuthZ --> TC["toolkit_connections.pending_flow_id"]
     TC --> Verify
 ```
-
-**Implementation notes (differs from original plan draft):**
-
-| Planned | Actually shipped |
-| ------- | ---------------- |
-| JWT signed with `ARCADE_VERIFIER_KEY` | Server-side `auth.confirmUser` via `ARCADE_API_KEY` ([lib/arcade/verifier.ts](lib/arcade/verifier.ts)) |
-| OAuth state encodes scope | Scope resolved from `pending_flow_id` → DB row ([connection-queries.ts](lib/db/connection-queries.ts)) |
-| Two stacked UI sections | Single table: toolkit × personal / workspace columns ([connections-client.tsx](components/connections/connections-client.tsx)) |
 
 ### Key files
 
 | Area | Path |
 | ---- | ---- |
-| ADRs | [docs/adr/0009](docs/adr/0009-control-plane-architecture.md), [docs/adr/0010](docs/adr/0010-arcade-custom-verifier-and-connection-scope.md) |
-| Identity | [lib/arcade/identity.ts](lib/arcade/identity.ts) |
+| ADRs | [docs/adr/0009](docs/adr/0009-control-plane-architecture.md), [docs/adr/0010](docs/adr/0010-arcade-custom-verifier-and-connection-scope.md) (amended) |
+| Identity | [lib/arcade/identity.ts](lib/arcade/identity.ts), [lib/env.ts](lib/env.ts) (`getArcadeVerifierMode`) |
 | Verifier | [lib/arcade/verifier.ts](lib/arcade/verifier.ts), [app/api/arcade/verify/route.ts](app/api/arcade/verify/route.ts) |
 | Connections | [app/api/connections/route.ts](app/api/connections/route.ts), [lib/db/connection-queries.ts](lib/db/connection-queries.ts) |
 | Provider readiness | [lib/arcade/auth-providers.ts](lib/arcade/auth-providers.ts), [components/settings/auth-providers-panel.tsx](components/settings/auth-providers-panel.tsx) |
 | Executor | [lib/aig/executor.ts](lib/aig/executor.ts), [lib/aig/connection-auth.ts](lib/aig/connection-auth.ts) |
 
-### Manual ops still required (Phase 3 blocker)
-
-Arcade Dashboard configuration — code cannot do this:
-
-1. **Auth → Settings → Custom verifier:** `${BETTER_AUTH_URL}/api/arcade/verify`
-2. **Connected Apps → Add OAuth Provider** per provider family (start with **Google** for Gmail)
-3. See **Settings → OAuth providers** in the app for full catalog + configured status
-
-Arcade default OAuth apps only work with the Arcade user verifier — production multi-user
-requires BYO credentials per [provider family](https://docs.arcade.dev/en/references/auth-providers)
-(~30 families, not per-toolkit).
-
 ---
 
 ## Phase 2 — Intent UI + live auth sync ✅
-
-Shipped in same WIP commit.
 
 | Deliverable | Path |
 | ----------- | ---- |
@@ -143,67 +142,88 @@ Shipped in same WIP commit.
 | Typed args form + JSON fallback | [lib/display/args-form.ts](lib/display/args-form.ts) |
 | Live OAuth sync (no manual refresh) | [lib/intent/authorization-sync.ts](lib/intent/authorization-sync.ts) |
 | Intent Authorize → connections POST | [intent-side-panel.tsx](components/intent/intent-side-panel.tsx) (stores `pending_flow_id`) |
-| App shell | [app/app/layout.tsx](app/app/layout.tsx), [components/app/](components/app/) |
-
-**UX decisions locked in:**
-
-- UNCERTAIN badge stays orange; canvas always selectable (inspect args while auth pending)
-- Only **Approve** stays locked until OAuth clears; edit/remove args allowed earlier
-- SSE stream uses auth fingerprint, not just mutation count
+| App shell + session-gate proxy | [app/app/layout.tsx](app/app/layout.tsx), [proxy.ts](proxy.ts) |
 
 ---
 
-## Phase 3 — Production OAuth unblock 🔲
+## Phase 3 — Polish + dev/prod verifier ✅ (uncommitted)
 
-**Goal:** End-to-end Gmail (or any Google toolkit) connect + intent approve on a real multi-user path.
+The big set of follow-up changes after the WIP commit, currently uncommitted:
+
+| Change | Path |
+| ------ | ---- |
+| Dev/prod verifier mode env | [lib/env.ts](lib/env.ts) `getArcadeVerifierMode()` / `usesArcadeUserVerifier()` |
+| Identity branches on mode | [lib/arcade/identity.ts](lib/arcade/identity.ts) |
+| `authorize` omits `next_uri` in `arcade` mode | [lib/arcade/authorize.ts](lib/arcade/authorize.ts) |
+| Arcade provider revoke (`admin.userConnections`) | [lib/arcade/authorize.ts](lib/arcade/authorize.ts) `revokeUserConnection` |
+| Scoped removal — revoke + reauthorize remaining | [app/api/connections/[toolkit]/route.ts](app/api/connections/[toolkit]/route.ts) DELETE |
+| List-time connection sync | [app/api/connections/route.ts](app/api/connections/route.ts) `syncPendingConnections` |
+| New-tab OAuth + visibility refresh | [components/connections/connections-client.tsx](components/connections/connections-client.tsx), [components/intent/intent-side-panel.tsx](components/intent/intent-side-panel.tsx) |
+| Radix Dialog primitive (no native confirms) | [components/ui/dialog.tsx](components/ui/dialog.tsx) |
+| Remove-toolkit confirmation dialog | [components/connections/connections-client.tsx](components/connections/connections-client.tsx) `RemoveToolkitDialog` |
+| Next 16 proxy migration | [proxy.ts](proxy.ts) (was `middleware.ts`) |
+| Auth-provider DTO exposes verifier mode | [app/api/auth-providers/route.ts](app/api/auth-providers/route.ts), [components/settings/auth-providers-panel.tsx](components/settings/auth-providers-panel.tsx) |
+| Playwright magic-link auth fixtures | [tests/e2e/fixtures/auth.ts](tests/e2e/fixtures/auth.ts), [app/api/test/magic-link/route.ts](app/api/test/magic-link/route.ts) |
+| Pipelines (Sprint 3) | [lib/aig/pipeline.ts](lib/aig/pipeline.ts), [lib/db/pipeline-queries.ts](lib/db/pipeline-queries.ts), [app/api/pipelines/](app/api/pipelines), [components/pipelines/](components/pipelines) |
+| Insights (Sprint 5) | [lib/db/insights-queries.ts](lib/db/insights-queries.ts), [app/api/insights/](app/api/insights), [components/insights/](components/insights) |
+| UNCERTAIN badge split | [lib/display/intent-status.ts](lib/display/intent-status.ts), [components/intent/intent-dashboard.tsx](components/intent/intent-dashboard.tsx) |
+
+Docs/rules refresh (this pass):
+
+| File | What changed |
+| ---- | ------------ |
+| [AGENTS.md](AGENTS.md) | `proxy.ts`, Dialog primitive, verifier-mode identity table, OAuth UX invariants, UI conventions |
+| [.cursor/rules/00-architecture.mdc](.cursor/rules/00-architecture.mdc) | Pipelines/insights/connections sync placement, UI conventions block |
+| [.cursor/rules/30-arcade.mdc](.cursor/rules/30-arcade.mdc) | OAuth UX, scoped revocation, admin.* preference |
+| [.cursor/rules/45-engineering-standards.mdc](.cursor/rules/45-engineering-standards.mdc) | UI conventions (no native dialogs) |
+| [docs/adr/0010](docs/adr/0010-arcade-custom-verifier-and-connection-scope.md) | Amendments — dev/prod mode, scoped removal, list-time sync, proxy |
+| [README.md](README.md) | Surface table updated to Shipped; verifier mode in setup |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev vs prod verifier mode setup |
+
+---
+
+## Phase 6 — Production cutover 🔲
+
+**Goal:** Flip the deployed tenant to `custom` verifier mode and run an end-to-end
+authorized intent in production.
 
 | Task | Owner | Notes |
 | ---- | ----- | ----- |
-| Custom verifier in Arcade Dashboard | Manual | Must match `BETTER_AUTH_URL` exactly |
+| Custom verifier URL in Arcade Dashboard | Manual | `${BETTER_AUTH_URL}/api/arcade/verify` |
 | Google OAuth app in Arcade Dashboard | Manual | One app covers all Google toolkits |
-| Verify intent Authorize → verify → return to intent | Code ✅ | Already wired; needs Dashboard |
-| Playwright magic-link auth | Code | Replace `E2E_SKIP_AUTH=1` incrementally |
-| `pnpm exec playwright install` | Local | Required before e2e locally |
+| `ARCADE_VERIFIER_MODE=custom` in Vercel | Manual | Identity flips to `user:{id}` / `workspace:{id}` |
+| Push branch + verify intent Authorize round-trip | Code | Already wired |
+| Playwright magic-link auth (replace `E2E_SKIP_AUTH=1` incrementally) | Code | Fixtures already in place |
 
 **Quality gate before push:**
 
 ```bash
-pnpm check:boundaries && pnpm test:unit && EVAL_MODE=mock pnpm test:eval
+pnpm typecheck && pnpm check:boundaries && pnpm test:unit && EVAL_MODE=mock pnpm test:eval
 ```
 
 ---
 
-## Phase 4 — Pipelines (Sprint 3) 🔲
-
-Per [ADR-0009](docs/adr/0009-control-plane-architecture.md): versioned templates promoted from runs.
-
-- [ ] Pipeline schema (template JSON, source intent FK, version, workspace scope)
-- [ ] Promote-from-run API + UI on intent detail
-- [ ] Replace [app/app/pipelines/page.tsx](app/app/pipelines/page.tsx) placeholder
-- [ ] Plan agent entry: "run from pipeline" vs freeform prompt
-
-**Terminology:** a **run** = one intent lifecycle; a **pipeline** = reusable template.
-
----
-
-## Phase 5 — Approval policies (Sprint 4) 🔲
+## Phase 7 — Approval policies (Sprint 4) 🔲
 
 - [ ] Policy rules per tool pattern (glob / toolkit / action)
 - [ ] Reviewer roles beyond org owner/admin
 - [ ] Team invites + member management in Settings
-- [ ] Replace Settings empty state placeholder
+- [ ] Replace Settings approvals/team empty states
 
-Data model is ready: `intents.approved_by_user_id`, workspace membership via Better Auth org.
+Data model is ready: `intents.approved_by_user_id`, workspace membership via
+Better Auth org. New tables expected: `approval_policies`, `policy_rules`.
+Will require an ADR amendment to ADR-0009.
 
 ---
 
-## Phase 6 — Insights + product gaps (Sprint 5) 🔲
+## Phase 8 — Remaining product gaps 🔲
 
-- [ ] /app/insights — connection health, run throughput, audit exports
-- [ ] Seeded demo pipeline for onboarding
-- [ ] **Add action / replan** — no API or UI yet
-- [ ] **Split UNCERTAIN** — auth-pending vs low-confidence grouping (same label today)
-- [ ] **Pipeline-first creation** — create from template, not only freeform plan
+- [ ] **Add action / replan** — API + UI to insert a new tool call into an
+      existing intent and trigger constrained repair. Repair engine already
+      supports this shape; needs a route and a side-panel affordance.
+- [ ] **Pipeline-first creation** — `/app/new` flow that lists pipelines and
+      lets a user kick off a run from a template, not only freeform plan.
+- [ ] **Seeded demo pipeline** — onboarding artifact for new tenants.
 
 ---
 

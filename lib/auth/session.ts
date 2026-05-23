@@ -8,6 +8,7 @@ import { auth } from '@/lib/auth/server'
 import { getMemberRole } from '@/lib/db/connection-queries'
 import type { ConnectionScope, Workspace } from '@/lib/db/schema'
 import { ensureDefaultWorkspace } from '@/lib/db/workspace-queries'
+import { env } from '@/lib/env'
 
 export type Session = Awaited<ReturnType<typeof auth.api.getSession>>
 
@@ -58,7 +59,9 @@ export async function resolveWorkspaceContext(): Promise<WorkspaceContext> {
       organizationId,
       memberRole,
       workspace,
-      personalArcadeUserId: toArcadeUserId(personalArcadeIdentity(session.user.id)),
+      personalArcadeUserId: toArcadeUserId(
+        personalArcadeIdentity(session.user.id, session.user.email),
+      ),
     }
   }
 
@@ -69,7 +72,7 @@ export async function resolveWorkspaceContext(): Promise<WorkspaceContext> {
     organizationId: workspace.organizationId,
     memberRole: null,
     workspace,
-    personalArcadeUserId: toArcadeUserId(personalArcadeIdentity('anonymous')),
+    personalArcadeUserId: toArcadeUserId(personalArcadeIdentity('anonymous', env.DEMO_USER_ID)),
   }
 }
 

@@ -1,12 +1,20 @@
 'use client'
 
 import { Lock, Plug, RefreshCw, Search, ShieldAlert, Unplug, User, Users } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import type { ConnectionDto, ConnectionScope } from '@/app/api/connections/route'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Container } from '@/components/ui/container'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
@@ -20,6 +28,8 @@ import { cn } from '@/lib/utils'
 
 interface ConnectionsResponse {
   workspace: { id: string; name: string; kind: string }
+  verifierMode: 'arcade' | 'custom'
+  sharedConnectionsSupported: boolean
   canManageShared: boolean
   configuredProviderIds: string[]
   catalogFetchedAt: number | null
@@ -114,6 +124,23 @@ export function ConnectionsClient() {
     }
   }, [data, mergedToolkits.length, query])
 
+  const awaitingAuthRef = useRef(false)
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && awaitingAuthRef.current) {
+        awaitingAuthRef.current = false
+        loadCatalog(true, debouncedQuery.trim())
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [debouncedQuery, loadCatalog])
+
   const connect = async (toolkitName: string, scope: ConnectionScope) => {
     const key = `${scope}:${toolkitName}`
     setPendingKey(key)
@@ -126,10 +153,32 @@ export function ConnectionsClient() {
       if (!res.ok) throw new Error(await res.text())
       const body = (await res.json()) as { connection: ConnectionDto }
       if (body.connection.authUrl) {
-        window.location.href = body.connection.authUrl
+        awaitingAuthRef.current = true
+        // Note: `noopener` makes window.open() return null, defeating popup-blocker
+        // detection. Open without it, then sever the opener manually.
+        const opened = window.open(body.connection.authUrl, '_blank')
+        if (!opened) {
+          window.location.href = body.connection.authUrl
+          return
+        }
+        try {
+          opened.opener = null
+        } catch {
+          /* cross-origin — best effort */
+        }
+        toast(`Authorize ${formatToolkitDisplayName(toolkitName)} in the new tab`, {
+          description: 'We will refresh this page when you return.',
+        })
         return
       }
-      toast.success(`${formatToolkitDisplayName(toolkitName)} connected`)
+      const providerLabel = body.connection.providerId
+        ? formatAuthProviderName(body.connection.providerId)
+        : null
+      toast.success(`${formatToolkitDisplayName(toolkitName)} connected`, {
+        description: providerLabel
+          ? `Scopes covered by your existing ${providerLabel} grant — no new OAuth needed.`
+          : 'Scopes already covered by an existing grant — no new OAuth needed.',
+      })
       loadCatalog(true, debouncedQuery.trim())
     } catch (error) {
       toast.error(
@@ -167,6 +216,70 @@ export function ConnectionsClient() {
     }
   }
 
+  const [removeTarget, setRemoveTarget] = useState<{
+    toolkitName: string
+    scope: ConnectionScope
+  } | null>(null)
+  const [isRemoving, setIsRemoving] = useState(false)
+
+  const requestRemove = (toolkitName: string, scope: ConnectionScope) => {
+    setRemoveTarget({ toolkitName, scope })
+  }
+
+  const confirmRemove = async () => {
+    if (!removeTarget) return
+    const { toolkitName, scope } = removeTarget
+    const key = `${scope}:${toolkitName}`
+    setIsRemoving(true)
+    setPendingKey(key)
+    try {
+      const res = await fetch(
+        `/api/connections/${encodeURIComponent(toolkitName)}?scope=${scope}`,
+        { method: 'DELETE' },
+      )
+      if (!res.ok) throw new Error(await res.text())
+      const body = (await res.json()) as {
+        revoked: boolean
+        providerId?: string | null
+        reauthorizeUrl?: string | null
+        reauthorizeToolkits?: string[]
+      }
+      if (body.reauthorizeUrl) {
+        awaitingAuthRef.current = true
+        const opened = window.open(body.reauthorizeUrl, '_blank')
+        if (!opened) {
+          window.location.href = body.reauthorizeUrl
+          return
+        }
+        try {
+          opened.opener = null
+        } catch {
+          /* cross-origin — best effort */
+        }
+      }
+
+      const reauthCount = body.reauthorizeToolkits?.length ?? 0
+      toast.success(`${formatToolkitDisplayName(toolkitName)} disconnected`, {
+        description: body.reauthorizeUrl
+          ? `Re-authorize ${reauthCount} remaining toolkit${reauthCount === 1 ? '' : 's'} in the new tab to keep their access.`
+          : body.revoked
+            ? 'Removed this toolkit and rebuilt the remaining provider grant.'
+            : 'No active Arcade grant to revoke.',
+      })
+      loadCatalog(true, debouncedQuery.trim())
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Failed to disconnect ${formatToolkitDisplayName(toolkitName)}`,
+      )
+    } finally {
+      setIsRemoving(false)
+      setPendingKey(null)
+      setRemoveTarget(null)
+    }
+  }
+
   return (
     <Container width="wide" className="flex flex-col gap-4 py-6 sm:py-8">
       <PageHeader
@@ -192,6 +305,26 @@ export function ConnectionsClient() {
           </Button>
         }
       />
+
+      {data?.verifierMode === 'arcade' ? (
+        <div className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-primary" />
+          <p className="text-muted-foreground leading-relaxed">
+            <strong className="text-foreground">Local dev mode.</strong> Arcade user verifier is
+            active — sign into{' '}
+            <a
+              className="text-primary hover:underline"
+              href="https://app.arcade.dev"
+              rel="noreferrer"
+              target="_blank"
+            >
+              arcade.dev
+            </a>{' '}
+            with the same email you use in AIG. Workspace-scoped connections require production
+            custom verifier mode.
+          </p>
+        </div>
+      ) : null}
 
       <p className="-mt-2 text-muted-foreground text-sm tabular-nums">
         {stats.searching ? (
@@ -286,12 +419,16 @@ export function ConnectionsClient() {
               <tbody>
                 {filtered.map((toolkit) => (
                   <ToolkitTableRow
-                    canManageShared={data?.canManageShared ?? false}
+                    canManageShared={
+                      (data?.canManageShared ?? false) &&
+                      (data?.sharedConnectionsSupported ?? false)
+                    }
                     configuredProviderIds={data?.configuredProviderIds ?? []}
                     key={toolkit.toolkitName}
                     pendingKey={pendingKey}
                     toolkit={toolkit}
                     onConnect={connect}
+                    onDisconnect={requestRemove}
                     onToggle={toggle}
                   />
                 ))}
@@ -300,7 +437,56 @@ export function ConnectionsClient() {
           </div>
         </Card>
       )}
+
+      <RemoveToolkitDialog
+        target={removeTarget}
+        pending={isRemoving}
+        onCancel={() => {
+          if (!isRemoving) setRemoveTarget(null)
+        }}
+        onConfirm={() => void confirmRemove()}
+      />
     </Container>
+  )
+}
+
+function RemoveToolkitDialog({
+  target,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  target: { toolkitName: string; scope: ConnectionScope } | null
+  pending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const toolkitLabel = target ? formatToolkitDisplayName(target.toolkitName) : ''
+  const providerLabel = target
+    ? formatAuthProviderName(inferProviderIdFromToolkit(target.toolkitName) ?? target.toolkitName)
+    : ''
+
+  return (
+    <Dialog open={target !== null} onOpenChange={(open) => (!open ? onCancel() : null)}>
+      <DialogContent showCloseButton={!pending}>
+        <DialogHeader>
+          <DialogTitle>Remove {toolkitLabel} access?</DialogTitle>
+          <DialogDescription>
+            OAuth cannot subtract a single scope from an existing {providerLabel} token. AIG will
+            revoke the {providerLabel} grant, remove {toolkitLabel}, then re-open OAuth so other{' '}
+            {providerLabel} toolkits keep their access.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="secondary" size="sm" disabled={pending} onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button variant="destructive" size="sm" disabled={pending} onClick={onConfirm}>
+            {pending ? 'Removing…' : `Remove ${toolkitLabel}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -362,6 +548,7 @@ function ToolkitTableRow({
   canManageShared,
   configuredProviderIds,
   onConnect,
+  onDisconnect,
   onToggle,
 }: {
   toolkit: MergedToolkit
@@ -369,6 +556,7 @@ function ToolkitTableRow({
   canManageShared: boolean
   configuredProviderIds: string[]
   onConnect: (toolkitName: string, scope: ConnectionScope) => void
+  onDisconnect: (toolkitName: string, scope: ConnectionScope) => void
   onToggle: (toolkitName: string, scope: ConnectionScope, enabled: boolean) => void
 }) {
   const providerId = inferProviderIdFromToolkit(toolkit.toolkitName)
@@ -400,6 +588,7 @@ function ToolkitTableRow({
           disabled={pendingKey === `personal:${toolkit.toolkitName}`}
           canManage
           onConnect={() => onConnect(toolkit.toolkitName, 'personal')}
+          onDisconnect={() => onDisconnect(toolkit.toolkitName, 'personal')}
           onToggle={(enabled) => onToggle(toolkit.toolkitName, 'personal', enabled)}
         />
       </td>
@@ -409,6 +598,7 @@ function ToolkitTableRow({
           disabled={pendingKey === `shared:${toolkit.toolkitName}`}
           canManage={canManageShared}
           onConnect={() => onConnect(toolkit.toolkitName, 'shared')}
+          onDisconnect={() => onDisconnect(toolkit.toolkitName, 'shared')}
           onToggle={(enabled) => onToggle(toolkit.toolkitName, 'shared', enabled)}
         />
       </td>
@@ -421,12 +611,14 @@ function ScopeCell({
   disabled,
   canManage,
   onConnect,
+  onDisconnect,
   onToggle,
 }: {
   connection?: ConnectionDto
   disabled: boolean
   canManage: boolean
   onConnect: () => void
+  onDisconnect: () => void
   onToggle: (enabled: boolean) => void
 }) {
   const connected = connection?.authStatus === 'completed'
@@ -465,10 +657,10 @@ function ScopeCell({
       <div className="flex justify-center py-0.5">
         <ScopeIconButton
           icon={Unplug}
-          label="Disconnect from planning"
+          label="Remove toolkit access"
           tone="connected"
           disabled={disabled}
-          onClick={() => onToggle(false)}
+          onClick={onDisconnect}
         />
       </div>
     )
@@ -511,7 +703,7 @@ function ScopeIconButton({
       className={cn(
         'size-7 [&_svg]:size-3.5',
         tone === 'default' && 'text-muted-foreground hover:bg-surface-2 hover:text-foreground',
-        tone === 'idle' && 'text-aig-approved/70 hover:bg-aig-approved/10 hover:text-aig-approved',
+        tone === 'idle' && 'text-muted-foreground hover:bg-surface-2 hover:text-foreground',
         tone === 'connected' &&
           'text-aig-approved hover:bg-aig-approved/10 hover:text-aig-approved',
         tone === 'failed' && 'text-aig-failed hover:bg-aig-failed/10 hover:text-aig-failed',

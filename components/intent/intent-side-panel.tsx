@@ -1,7 +1,7 @@
 'use client'
 
 import { ExternalLink, ShieldAlert } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ToolCallArgsEditor } from '@/components/intent/tool-call-args-editor'
 import type { ToolCallDto } from '@/components/intent/types'
@@ -46,10 +46,26 @@ export function IntentSidePanel({
   const selected = toolCalls.find((tc) => tc.id === selectedId) ?? null
   const [tab, setTab] = useState<'overview' | 'details'>(selected ? 'details' : 'overview')
   const byId = new Map(toolCalls.map((tc) => [tc.id, tc]))
+  const awaitingAuthRef = useRef(false)
 
   useEffect(() => {
     if (selected) setTab('details')
   }, [selected])
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && awaitingAuthRef.current) {
+        awaitingAuthRef.current = false
+        void onChanged()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [onChanged])
 
   return (
     <Card className="flex h-full min-h-[320px] flex-col overflow-hidden">
@@ -125,7 +141,13 @@ export function IntentSidePanel({
                         </p>
                       </div>
                       {auth.url || auth.status === 'pending' ? (
-                        <IntentAuthorizeButton returnTo={returnTo} tool={auth.tool} />
+                        <IntentAuthorizeButton
+                          returnTo={returnTo}
+                          tool={auth.tool}
+                          onOAuthOpened={() => {
+                            awaitingAuthRef.current = true
+                          }}
+                        />
                       ) : (
                         <span className="font-mono text-[10px] text-muted-foreground uppercase">
                           {auth.status ?? 'unknown'}
@@ -200,7 +222,15 @@ export function IntentSidePanel({
   )
 }
 
-function IntentAuthorizeButton({ tool, returnTo }: { tool: string; returnTo: string }) {
+function IntentAuthorizeButton({
+  tool,
+  returnTo,
+  onOAuthOpened,
+}: {
+  tool: string
+  returnTo: string
+  onOAuthOpened: () => void
+}) {
   const [pending, setPending] = useState(false)
   const toolkitName = parseArcadeTool(tool).toolkit
 
@@ -215,7 +245,22 @@ function IntentAuthorizeButton({ tool, returnTo }: { tool: string; returnTo: str
       if (!res.ok) throw new Error(await res.text())
       const body = (await res.json()) as { connection: { authUrl: string | null } }
       if (body.connection.authUrl) {
-        window.location.href = body.connection.authUrl
+        onOAuthOpened()
+        // Open without `noopener` so we can detect popup blockers (with noopener
+        // window.open() returns null per spec). Sever the opener manually.
+        const opened = window.open(body.connection.authUrl, '_blank')
+        if (!opened) {
+          window.location.href = body.connection.authUrl
+          return
+        }
+        try {
+          opened.opener = null
+        } catch {
+          /* cross-origin — best effort */
+        }
+        toast(`Authorize ${formatToolkitDisplayName(toolkitName)} in the new tab`, {
+          description: 'This intent will update automatically when you return.',
+        })
         return
       }
       toast.success(`${formatToolkitDisplayName(toolkitName)} connected`)

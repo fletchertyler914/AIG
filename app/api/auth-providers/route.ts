@@ -1,7 +1,7 @@
 import { jsonError, jsonOk, messageFromUnknown } from '@/lib/api/http'
 import { getAuthProviderReadiness } from '@/lib/arcade/auth-providers'
 import { canManageSharedConnections, resolveWorkspaceContext } from '@/lib/auth/session'
-import { env } from '@/lib/env'
+import { env, getArcadeVerifierMode } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -23,6 +23,7 @@ export interface AuthProviderReadinessDto {
   }>
   configuredCount: number
   missingCount: number
+  verifierMode: 'arcade' | 'custom'
   customVerifierUrl: string
   arcadeDashboardUrl: string
 }
@@ -52,6 +53,7 @@ export async function GET(request: Request) {
       configured: readiness.configured,
       configuredCount: readiness.configuredProviderIds.length,
       missingCount: readiness.missingProviderIds.length,
+      verifierMode: getArcadeVerifierMode(),
       customVerifierUrl: `${env.BETTER_AUTH_URL}/api/arcade/verify`,
       arcadeDashboardUrl: 'https://api.arcade.dev/dashboard/auth/settings',
     }

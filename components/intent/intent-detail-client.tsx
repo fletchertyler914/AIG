@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, CheckCircle2, LayoutGrid, List, Lock } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, GitBranch, LayoutGrid, List, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
@@ -10,10 +10,12 @@ import { IntentSidePanel } from '@/components/intent/intent-side-panel'
 import { IntentTraceDrawer } from '@/components/intent/intent-trace-drawer'
 import type { IntentWithTraceDto } from '@/components/intent/types'
 import { asRecord } from '@/components/intent/types'
-import { IntentStatusBadge } from '@/components/ui/badge'
+import { IntentDisplayBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Container } from '@/components/ui/container'
+import { canPromoteIntentStatus } from '@/lib/aig/pipeline'
+import { intentStatusDisplay } from '@/lib/display/intent-status'
 import { formatToolkitDisplayName } from '@/lib/display/toolkits'
 import { cn } from '@/lib/utils'
 
@@ -124,8 +126,29 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
   const impact = asRecord(data.intent.impact)
   const bySystem = asRecord(impact['bySystem'])
   const pendingAuths = readPendingAuthorizations(impact)
+  const statusDisplay = intentStatusDisplay({
+    status: data.intent.status,
+    confidence: data.intent.confidence,
+    pendingAuthCount: pendingAuths.length,
+  })
   const agentSummary = typeof impact['agentSummary'] === 'string' ? impact['agentSummary'] : null
   const canApprove = data.intent.status === 'PENDING_REVIEW' && pendingAuths.length === 0
+  const showPromote = canPromoteIntentStatus(data.intent.status)
+
+  const promoteToPipeline = () => {
+    startTransition(async () => {
+      const res = await fetch('/api/pipelines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intentId }),
+      })
+      if (!res.ok) {
+        toast.error(await res.text())
+        return
+      }
+      toast.success('Pipeline saved — open Pipelines to run it again.')
+    })
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col pb-14">
@@ -142,7 +165,12 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
                 Back to runs
               </Link>
               <span className="hidden h-4 w-px bg-border sm:inline" aria-hidden />
-              <IntentStatusBadge status={data.intent.status} data-testid="intent-status" />
+              <IntentDisplayBadge
+                status={data.intent.status}
+                confidence={data.intent.confidence}
+                impact={data.intent.impact}
+                data-testid="intent-status"
+              />
               {data.intent.systems.map((system) => (
                 <span
                   key={system}
@@ -153,6 +181,19 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
               ))}
             </div>
             <div className="flex items-center gap-2">
+              {showPromote ? (
+                <Button
+                  disabled={isPending}
+                  onClick={promoteToPipeline}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                  className="gap-1.5"
+                >
+                  <GitBranch className="size-3.5" />
+                  Save as pipeline
+                </Button>
+              ) : null}
               <Button
                 size="lg"
                 variant="display"
@@ -174,10 +215,8 @@ export function IntentDetailClient({ intentId }: IntentDetailClientProps) {
               </Button>
             </div>
           </div>
-          {pendingAuths.length > 0 ? (
-            <p className="mt-2 text-muted-foreground text-xs">
-              Review and edit the plan below. Authorize toolkits in the panel to enable approval.
-            </p>
+          {statusDisplay.hint ? (
+            <p className="mt-2 text-muted-foreground text-xs">{statusDisplay.hint}</p>
           ) : null}
         </div>
 

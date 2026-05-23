@@ -48,9 +48,19 @@ export function AuthProvidersPanel() {
             </p>
             <h2 className="font-semibold text-lg tracking-tight">Arcade auth setup</h2>
             <p className="max-w-2xl text-muted-foreground text-sm leading-relaxed">
-              AIG uses a custom user verifier for production. Register your own OAuth apps in Arcade
-              — one per provider family (Google covers Gmail, Calendar, Drive, etc.). End users only
-              click Authorize; they never configure OAuth.
+              {data?.verifierMode === 'arcade' ? (
+                <>
+                  Local dev uses Arcade&apos;s built-in user verifier. Sign into arcade.dev with the
+                  same email as AIG — Arcade default OAuth apps work without registering your own
+                  credentials.
+                </>
+              ) : (
+                <>
+                  Production uses a custom user verifier. Register your own OAuth apps in Arcade —
+                  one per provider family (Google covers Gmail, Calendar, Drive, etc.). End users
+                  only click Authorize; they never configure OAuth.
+                </>
+              )}
             </p>
           </div>
           <Button
@@ -66,11 +76,19 @@ export function AuthProvidersPanel() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <SetupLink
-            href={data?.customVerifierUrl ?? '#'}
-            label="Custom verifier URL"
-            value={data?.customVerifierUrl ?? 'Loading…'}
-          />
+          {data?.verifierMode === 'custom' ? (
+            <SetupLink
+              href={data?.customVerifierUrl ?? '#'}
+              label="Custom verifier URL"
+              value={data?.customVerifierUrl ?? 'Loading…'}
+            />
+          ) : (
+            <SetupLink
+              href="https://api.arcade.dev/dashboard/auth/settings"
+              label="Verifier mode"
+              value="Arcade user verifier (local dev)"
+            />
+          )}
           <SetupLink
             href={data?.arcadeDashboardUrl ?? 'https://api.arcade.dev/dashboard/auth/settings'}
             label="Arcade Dashboard"
@@ -153,17 +171,27 @@ export function AuthProvidersPanel() {
               <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 p-3 text-sm">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                 <p className="text-muted-foreground leading-relaxed">
-                  No custom OAuth providers registered yet. With the custom user verifier enabled,
-                  Arcade&apos;s default OAuth apps will not work — start with{' '}
-                  <a
-                    className="text-primary hover:underline"
-                    href="https://docs.arcade.dev/en/references/auth-providers/google"
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    Google
-                  </a>{' '}
-                  if you need Gmail or Calendar.
+                  {data.verifierMode === 'arcade' ? (
+                    <>
+                      In local dev, Arcade&apos;s default OAuth apps work once you are signed into
+                      arcade.dev with the same email as AIG. Custom provider registration is only
+                      required for production custom verifier mode.
+                    </>
+                  ) : (
+                    <>
+                      No custom OAuth providers registered yet. With the custom user verifier
+                      enabled, Arcade&apos;s default OAuth apps will not work — start with{' '}
+                      <a
+                        className="text-primary hover:underline"
+                        href="https://docs.arcade.dev/en/references/auth-providers/google"
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Google
+                      </a>{' '}
+                      if you need Gmail or Calendar.
+                    </>
+                  )}
                 </p>
               </div>
             )}

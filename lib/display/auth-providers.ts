@@ -249,7 +249,10 @@ const TOOLKIT_PREFIX_TO_PROVIDER: ReadonlyArray<[prefix: string, providerId: str
 ]
 
 export function formatAuthProviderName(providerId: string): string {
-  return CATALOG_BY_ID.get(providerId)?.name ?? providerId
+  const normalized = providerId.startsWith('arcade-')
+    ? providerId.slice('arcade-'.length)
+    : providerId
+  return CATALOG_BY_ID.get(normalized)?.name ?? providerId
 }
 
 export function getAuthProviderCatalogEntry(providerId: string): AuthProviderCatalogEntry | null {

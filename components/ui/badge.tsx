@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import type { HTMLAttributes } from 'react'
+import { intentStatusDisplay, readPendingAuthCount } from '@/lib/display/intent-status'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
@@ -79,6 +80,30 @@ export function IntentStatusBadge({
   return (
     <Badge variant={INTENT_STATUS_VARIANT[status] ?? 'neutral'} className={className} {...rest}>
       {status}
+    </Badge>
+  )
+}
+
+/** Context-aware badge — splits UNCERTAIN into AUTH REQUIRED vs LOW CONFIDENCE. */
+export function IntentDisplayBadge({
+  status,
+  confidence,
+  impact,
+  className,
+  ...rest
+}: {
+  status: string
+  confidence?: string | null
+  impact?: unknown
+} & Omit<BadgeProps, 'variant'>) {
+  const display = intentStatusDisplay({
+    status,
+    confidence,
+    pendingAuthCount: readPendingAuthCount(impact),
+  })
+  return (
+    <Badge variant={display.variant} className={className} {...rest}>
+      {display.label}
     </Badge>
   )
 }

@@ -90,10 +90,10 @@ AIG is evolving into Arcade's **pre-execution governance control plane** (ADR-00
 | Surface | Route | Status |
 | ------- | ----- | ------ |
 | Runs (intents) | `/app` | Shipped — graph review, form args editor, live SSE |
-| Connections (toolkit OAuth) | `/app/connections` | Shipped — personal + workspace scope |
-| Pipelines | `/app/pipelines` | Placeholder (Sprint 3) |
-| Insights | `/app/insights` | Placeholder (Sprint 5) |
-| Settings | `/app/settings` | Placeholder |
+| Connections (toolkit OAuth) | `/app/connections` | Shipped — personal + workspace scope, new-tab OAuth, scoped removal |
+| Pipelines | `/app/pipelines` | Shipped — promote a run to a versioned template, replay against new prompts |
+| Insights | `/app/insights` | Shipped — connection health, run throughput, audit exports |
+| Settings | `/app/settings` | OAuth providers panel shipped; approval policies + team invites pending |
 
 Sign-in: Better Auth magic link. Tenancy: org + `production` workspace per user.
 
@@ -177,6 +177,11 @@ cp .env.example .env.local
 # Required: DATABASE_URL, ANTHROPIC_API_KEY, ARCADE_API_KEY,
 #   BETTER_AUTH_SECRET, BETTER_AUTH_URL
 # Optional: RESEND_API_KEY (dev magic links log to console if unset)
+# Optional: ARCADE_VERIFIER_MODE=arcade|custom
+#   - `arcade` (dev default) uses Arcade's built-in user verifier and default
+#     OAuth apps. Sign into arcade.dev with the same email as AIG.
+#   - `custom` (prod default) uses /api/arcade/verify and your own OAuth apps
+#     per provider family. Required for multi-user production. See ADR-0010.
 pnpm db:push
 pnpm dev
 ```

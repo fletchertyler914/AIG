@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from 'next/server'
 
-/** Read directly — middleware runs on Edge and cannot import full env module. */
+/** Read directly — proxy runs on Edge and cannot import full env module. */
 const skipAuth = process.env['E2E_SKIP_AUTH'] === '1' || process.env['E2E_SKIP_AUTH'] === 'true'
 
-const PUBLIC_PATHS = ['/', '/sign-in', '/api/auth', '/api/health'] as const
+const PUBLIC_PATHS = ['/', '/sign-in', '/api/auth', '/api/health', '/api/test'] as const
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (skipAuth) {

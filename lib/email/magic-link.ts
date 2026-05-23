@@ -7,7 +7,7 @@
  */
 
 import { Resend } from 'resend'
-import { env, isDevelopment } from '@/lib/env'
+import { env, isDevelopment, isE2eCaptureMagicLink } from '@/lib/env'
 import { logger } from '@/lib/logger'
 import { renderMagicLinkHtml, renderMagicLinkText } from './templates/magic-link'
 
@@ -19,6 +19,16 @@ interface SendMagicLinkArgs {
 
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null
 
+const capturedLinks = new Map<string, string>()
+
+export function getCapturedMagicLink(email: string): string | null {
+  return capturedLinks.get(email.toLowerCase()) ?? null
+}
+
+export function clearCapturedMagicLinksForTests(): void {
+  capturedLinks.clear()
+}
+
 export async function sendMagicLinkEmail({ to, url, token }: SendMagicLinkArgs): Promise<void> {
   const subject = 'Your AIG sign-in link'
   const [html, text] = await Promise.all([
@@ -27,7 +37,8 @@ export async function sendMagicLinkEmail({ to, url, token }: SendMagicLinkArgs):
   ])
 
   if (!resend) {
-    if (isDevelopment) {
+    if (isDevelopment || isE2eCaptureMagicLink) {
+      capturedLinks.set(to.toLowerCase(), url)
       logger.info(
         { to, url, token, hint: 'set RESEND_API_KEY to deliver real emails' },
         '[dev] magic-link (open URL in browser to sign in)',

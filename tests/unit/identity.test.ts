@@ -4,28 +4,60 @@ import {
   parseFlowIdFromAuthUrl,
   personalArcadeIdentity,
   sharedArcadeIdentity,
+  sharedArcadeIdentitySupported,
   toArcadeUserId,
   toolkitFromToolName,
 } from '@/lib/arcade/identity'
 
 describe('toArcadeUserId', () => {
-  it('prefixes personal identities with user:', () => {
-    expect(toArcadeUserId(personalArcadeIdentity('usr_01'))).toBe('user:usr_01')
+  it('uses prefixed user id in custom verifier mode', () => {
+    expect(
+      toArcadeUserId(personalArcadeIdentity('usr_01', 'dev@example.com'), {
+        verifierMode: 'custom',
+      }),
+    ).toBe('user:usr_01')
   })
 
-  it('prefixes shared identities with workspace:', () => {
-    expect(toArcadeUserId(sharedArcadeIdentity('ws_01'))).toBe('workspace:ws_01')
+  it('uses operator email in arcade verifier mode', () => {
+    expect(
+      toArcadeUserId(personalArcadeIdentity('usr_01', 'dev@example.com'), {
+        verifierMode: 'arcade',
+      }),
+    ).toBe('dev@example.com')
+  })
+
+  it('falls back to DEMO_USER_ID in arcade mode without email', () => {
+    expect(toArcadeUserId(personalArcadeIdentity('usr_01'), { verifierMode: 'arcade' })).toMatch(
+      /@/,
+    )
+  })
+
+  it('prefixes shared identities with workspace: in both modes', () => {
+    expect(toArcadeUserId(sharedArcadeIdentity('ws_01'), { verifierMode: 'custom' })).toBe(
+      'workspace:ws_01',
+    )
+    expect(toArcadeUserId(sharedArcadeIdentity('ws_01'), { verifierMode: 'arcade' })).toBe(
+      'workspace:ws_01',
+    )
+  })
+})
+
+describe('sharedArcadeIdentitySupported', () => {
+  it('is true only in custom mode', () => {
+    expect(sharedArcadeIdentitySupported({ verifierMode: 'custom' })).toBe(true)
+    expect(sharedArcadeIdentitySupported({ verifierMode: 'arcade' })).toBe(false)
   })
 })
 
 describe('arcadeIdentityForScope', () => {
-  it('returns personal identity for personal scope', () => {
+  it('returns personal identity with optional email', () => {
     const id = arcadeIdentityForScope({
       scope: 'personal',
       userId: 'u1',
       workspaceId: 'w1',
+      email: 'u1@example.com',
     })
-    expect(id).toEqual({ kind: 'personal', userId: 'u1' })
+    expect(id).toEqual({ kind: 'personal', userId: 'u1', email: 'u1@example.com' })
   })
 
   it('returns shared identity for shared scope', () => {

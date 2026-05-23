@@ -17,8 +17,9 @@ boundaries every change must respect.
   or `lib/auth/server.ts`. Use API routes, `lib/auth/client`, or `lib/display/**`.
 - `@arcadeai/arcadejs` MUST NOT be imported outside `lib/arcade/**` (scripts exempt).
 - `better-auth` MUST NOT be imported outside `lib/auth/**` and `app/api/auth/**`.
-- `process.env` MUST NOT be read outside `lib/env.ts` (config/test/script paths exempt).
-  CI enforces via `pnpm check:boundaries`.
+- `process.env` MUST NOT be read outside `lib/env.ts` (config/test/script paths,
+  plus the Next 16 `proxy.ts` edge entry, are exempt). CI enforces via
+  `pnpm check:boundaries`.
 - Nothing outside `lib/logger.ts` constructs a `pino` logger.
 
 ## Side-effect placement
@@ -38,6 +39,10 @@ boundaries every change must respect.
 | HTTP JSON helpers | `lib/api/http.ts` |
 | HTTP route handlers | `app/api/**/route.ts` only |
 | Intent OAuth sync + SSE fingerprint | `lib/intent/authorization-sync.ts` |
+| Connections list-time Arcade re-check | `app/api/connections/route.ts` (`syncPendingConnections`) |
+| Pipelines (templates promoted from runs) | `lib/db/pipeline-queries.ts`, `lib/aig/pipeline.ts` |
+| Insights (read-only stats) | `lib/db/insights-queries.ts` |
+| Session-gate proxy (Next 16) | `proxy.ts` (was `middleware.ts`) |
 | Import boundary CI | `scripts/check-boundaries.ts` (`pnpm check:boundaries`) |
 
 ## TypeScript hygiene
@@ -48,6 +53,13 @@ boundaries every change must respect.
   in `lib/aig/types.ts` if they are domain primitives.
 - Result types: prefer `{ ok: true, data } | { ok: false, error }` for any
   function that can fail in a non-exceptional way. Throw only for invariants.
+
+## UI conventions
+
+- All modals and confirmations use `components/ui/dialog.tsx` (Radix Dialog).
+- `window.confirm`, `window.alert`, and `window.prompt` are forbidden anywhere
+  in `components/**` and `app/**`. Destructive actions go in a Dialog with the
+  `destructive` button variant.
 
 ## State machine
 

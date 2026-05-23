@@ -138,6 +138,7 @@ export async function upsertToolkitConnection(input: {
   catalogEntry: ToolkitCatalogEntry
   scope: ConnectionScope
   ownerUserId?: string | null
+  operatorEmail?: string | null
   enabled?: boolean
   authStatus?: ConnectionAuthStatus
   authUrl?: string | null
@@ -151,6 +152,7 @@ export async function upsertToolkitConnection(input: {
     scope: input.scope,
     userId: input.ownerUserId ?? '',
     workspaceId: input.workspaceId,
+    ...(input.operatorEmail !== undefined ? { email: input.operatorEmail } : {}),
   })
   const arcadeUserId = input.arcadeUserId ?? toArcadeUserId(identity)
   const pendingFlowId =
@@ -239,6 +241,88 @@ export async function setToolkitConnectionEnabled(input: {
       ),
     )
     .returning()
+  return row ?? null
+}
+
+/**
+ * Mark a connection as completed after Arcade reports the OAuth flow succeeded.
+ * Clears any stored auth URL / flow id; sets `connectedAt`.
+ */
+export async function markConnectionCompleted(
+  connectionId: string,
+): Promise<ToolkitConnection | null> {
+  const now = Date.now()
+  const [row] = await db
+    .update(toolkitConnections)
+    .set({
+      authStatus: 'completed',
+      authUrl: null,
+      pendingFlowId: null,
+      connectedAt: now,
+      lastCheckedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(toolkitConnections.id, connectionId))
+    .returning()
+  return row ?? null
+}
+
+export async function touchConnectionLastChecked(connectionId: string): Promise<void> {
+  const now = Date.now()
+  await db
+    .update(toolkitConnections)
+    .set({ lastCheckedAt: now, updatedAt: now })
+    .where(eq(toolkitConnections.id, connectionId))
+}
+
+/**
+ * Reset a connection after an Arcade-side revoke. Keeps the row (so the user's
+ * enabled/disabled preference is preserved for the toolkit if they reconnect),
+ * but clears all auth state.
+ */
+export async function resetConnectionAfterRevoke(
+  connectionId: string,
+): Promise<ToolkitConnection | null> {
+  const now = Date.now()
+  const [row] = await db
+    .update(toolkitConnections)
+    .set({
+      authStatus: 'unknown',
+      authUrl: null,
+      pendingFlowId: null,
+      connectedAt: null,
+      enabled: false,
+      lastCheckedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(toolkitConnections.id, connectionId))
+    .returning()
+  return row ?? null
+}
+
+export async function markConnectionAuthorization(input: {
+  connectionId: string
+  authStatus: ConnectionAuthStatus
+  authUrl?: string | null
+  providerId?: string | null
+  pendingFlowId?: string | null
+  connectedAt?: number | null
+}): Promise<ToolkitConnection | null> {
+  const now = Date.now()
+  const [row] = await db
+    .update(toolkitConnections)
+    .set({
+      authStatus: input.authStatus,
+      ...(input.authUrl !== undefined ? { authUrl: input.authUrl } : {}),
+      ...(input.providerId !== undefined ? { providerId: input.providerId } : {}),
+      ...(input.pendingFlowId !== undefined ? { pendingFlowId: input.pendingFlowId } : {}),
+      ...(input.connectedAt !== undefined ? { connectedAt: input.connectedAt } : {}),
+      lastCheckedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(toolkitConnections.id, input.connectionId))
+    .returning()
+
   return row ?? null
 }
 

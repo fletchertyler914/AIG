@@ -7,11 +7,76 @@ import {
   getCatalogCacheMeta,
   listArcadeToolkitCatalogForConnections,
 } from '@/lib/arcade/catalog'
-import { arcadeIdentityForScope, toArcadeUserId } from '@/lib/arcade/identity'
+import {
+  arcadeIdentityForScope,
+  sharedArcadeIdentitySupported,
+  toArcadeUserId,
+} from '@/lib/arcade/identity'
 import { canManageSharedConnections, resolveWorkspaceContext } from '@/lib/auth/session'
-import { listToolkitConnectionsForUser, upsertToolkitConnection } from '@/lib/db/connection-queries'
+import {
+  listToolkitConnectionsForUser,
+  markConnectionCompleted,
+  touchConnectionLastChecked,
+  upsertToolkitConnection,
+} from '@/lib/db/connection-queries'
 import type { ConnectionAuthStatus, ToolkitConnection } from '@/lib/db/schema'
-import { env } from '@/lib/env'
+import { env, getArcadeVerifierMode } from '@/lib/env'
+import { logger } from '@/lib/logger'
+
+const log = logger.child({ route: '/api/connections' })
+
+/**
+ * Re-check Arcade for any connection rows that aren't yet `completed`. Arcade's
+ * tools.authorize is idempotent — if the user already finished OAuth in another
+ * tab, this picks it up and flips the DB row to `completed`.
+ *
+ * `failed` rows are skipped — the user must explicitly retry.
+ */
+async function syncPendingConnections(input: {
+  workspaceId: string
+  fallbackUserId: string
+  email: string
+  rows: ToolkitConnection[]
+}): Promise<ToolkitConnection[]> {
+  const needsCheck = input.rows.filter(
+    (row): row is ToolkitConnection & { representativeTool: string } =>
+      row.authStatus !== 'completed' &&
+      row.authStatus !== 'failed' &&
+      typeof row.representativeTool === 'string' &&
+      row.representativeTool.length > 0,
+  )
+  if (needsCheck.length === 0) return input.rows
+
+  const updates = await Promise.all(
+    needsCheck.map(async (row) => {
+      try {
+        const identity = arcadeIdentityForScope({
+          scope: row.scope,
+          userId: row.ownerUserId ?? input.fallbackUserId,
+          workspaceId: input.workspaceId,
+          email: input.email,
+        })
+        const auth = await authorizeToolkit({
+          toolkitName: row.toolkitName,
+          representativeTool: row.representativeTool,
+          identity,
+        })
+        if (auth.status === 'completed') {
+          const updated = await markConnectionCompleted(row.id)
+          return [row.id, updated ?? row] as const
+        }
+        await touchConnectionLastChecked(row.id)
+        return [row.id, row] as const
+      } catch (error) {
+        log.warn({ err: error, toolkit: row.toolkitName }, 'connection auth re-check failed')
+        return [row.id, row] as const
+      }
+    }),
+  )
+
+  const byId = new Map(updates)
+  return input.rows.map((row) => byId.get(row.id) ?? row)
+}
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -56,6 +121,7 @@ export async function GET(request: Request) {
       scope: 'personal',
       userId: ctx.userId,
       workspaceId: ctx.workspace.id,
+      email: ctx.email,
     })
     const arcadeUserId = toArcadeUserId(identity)
     const { entries: catalog, indexTotal } = await listArcadeToolkitCatalogForConnections({
@@ -71,8 +137,23 @@ export async function GET(request: Request) {
       userId: ctx.userId,
     })
 
-    const personalByName = new Map(personalRows.map((row) => [row.toolkitName, row]))
-    const sharedByName = new Map(sharedRows.map((row) => [row.toolkitName, row]))
+    const [syncedPersonal, syncedShared] = await Promise.all([
+      syncPendingConnections({
+        workspaceId: ctx.workspace.id,
+        fallbackUserId: ctx.userId,
+        email: ctx.email,
+        rows: personalRows,
+      }),
+      syncPendingConnections({
+        workspaceId: ctx.workspace.id,
+        fallbackUserId: ctx.userId,
+        email: ctx.email,
+        rows: sharedRows,
+      }),
+    ])
+
+    const personalByName = new Map(syncedPersonal.map((row) => [row.toolkitName, row]))
+    const sharedByName = new Map(syncedShared.map((row) => [row.toolkitName, row]))
     const configuredProviderIds = await listConfiguredProviderIds({ force })
 
     return jsonOk({
@@ -81,6 +162,8 @@ export async function GET(request: Request) {
         name: ctx.workspace.name,
         kind: ctx.workspace.kind,
       },
+      verifierMode: getArcadeVerifierMode(),
+      sharedConnectionsSupported: sharedArcadeIdentitySupported(),
       canManageShared: canManageSharedConnections(ctx.memberRole),
       configuredProviderIds,
       catalogFetchedAt: cacheMeta.fetchedAt,
@@ -103,10 +186,18 @@ export async function POST(request: Request) {
       return jsonError('Only workspace owners and admins can connect shared toolkits', 403)
     }
 
+    if (body.scope === 'shared' && !sharedArcadeIdentitySupported()) {
+      return jsonError(
+        'Shared toolkit connections require custom verifier mode (production). Use personal connections in local dev.',
+        422,
+      )
+    }
+
     const identity = arcadeIdentityForScope({
       scope: body.scope,
       userId: ctx.userId,
       workspaceId: ctx.workspace.id,
+      email: ctx.email,
     })
     const arcadeUserId = toArcadeUserId(identity)
 
@@ -128,6 +219,7 @@ export async function POST(request: Request) {
       catalogEntry: entry,
       scope: body.scope,
       ownerUserId: body.scope === 'personal' ? ctx.userId : null,
+      operatorEmail: ctx.email,
       enabled: true,
       authStatus: auth.status,
       authUrl: auth.url ?? null,
