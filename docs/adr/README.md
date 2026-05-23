@@ -10,7 +10,7 @@ auth, connections, or the intent lifecycle.
 | [0003](0003-claude-structured-output-for-repair.md) | Claude structured output for repair | Accepted |
 | [0004](0004-halt-on-failure-rollback.md) | Halt-on-failure execution (no compensating rollback in MVP) | Accepted |
 | [0005](0005-co-authorship-trace-as-hero.md) | Co-authorship trace as primary artifact | Accepted |
-| [0009](0009-control-plane-architecture.md) | Control plane: Better Auth, workspaces, connections | Accepted |
+| [0009](0009-control-plane-architecture.md) | Control plane: Better Auth, workspaces, connections | Accepted (amended for approval-policy foundation) |
 | [0010](0010-arcade-custom-verifier-and-connection-scope.md) | Custom Arcade verifier + personal/shared connections | Accepted (amended for dev/prod mode + scoped removal) |
 
 ## When to add an ADR

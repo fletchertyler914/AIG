@@ -1,9 +1,9 @@
 ---
 name: aig-control-plane-roadmap
 overview: >-
-  Control-plane delivery roadmap for AIG. Phases 1, 2, 4, and 6 are shipped on the
-  current branch (1 ahead of origin/main + uncommitted polish). Pending phases:
-  production cutover, approval policies, remaining product gaps.
+  Control-plane delivery roadmap for AIG. Phases 1-5 plus the first Sprint 4
+  approval-policy slice are shipped on the current branch. Pending phases:
+  production cutover, reviewer-role/team management, remaining product gaps.
 todos:
   # ── Phase 1: Arcade identity + connections (DONE) ────────────────────────
   - id: adr
@@ -80,24 +80,34 @@ todos:
   - id: prod-cutover
     content: 'Set ARCADE_VERIFIER_MODE=custom in Vercel; push branch; live E2E against prod tenant'
     status: pending
-  # ── Phase 7: Approval policies (PENDING) ─────────────────────────────────
+  # ── Phase 7: Approval policies (IN PROGRESS) ─────────────────────────────
   - id: policies
-    content: Per-tool-pattern approval rules, reviewer roles beyond owner/admin, team invites in Settings
+    content: Per-tool-pattern approval rules + approve-time enforcement + Settings UI
+    status: completed
+  - id: reviewer-roles
+    content: Reviewer roles beyond owner/admin
     status: pending
+  - id: team-settings
+    content: Team/member Settings UI + pending invites
+    status: completed
   # ── Phase 8: Remaining product gaps (PENDING) ────────────────────────────
   - id: add-action
     content: Add-action / replan API + UI from intent detail
-    status: pending
+    status: completed
   - id: pipeline-first-create
     content: Pipeline-first creation entry on dashboard (template chooser, not only freeform prompt)
-    status: pending
+    status: completed
+  - id: seeded-demo-pipeline
+    content: Seed onboarding pipeline for new workspaces
+    status: completed
 isProject: true
 ---
 
 # AIG control plane roadmap
 
-**Branch state:** 1 commit ahead of `origin/main` (`479ab91` last roadmap refresh),
-plus a substantial uncommitted polish round documented under Phase 3 below.
+**Branch state:** synced through `fe9cd74`, with the current uncommitted Sprint 4
+approval-policy, team settings, add-action/replan, and seeded-pipeline work
+documented below.
 
 ---
 
@@ -146,9 +156,9 @@ flowchart LR
 
 ---
 
-## Phase 3 — Polish + dev/prod verifier ✅ (uncommitted)
+## Phase 3 — Polish + dev/prod verifier ✅
 
-The big set of follow-up changes after the WIP commit, currently uncommitted:
+The big set of follow-up changes after the WIP commit:
 
 | Change | Path |
 | ------ | ---- |
@@ -203,27 +213,42 @@ pnpm typecheck && pnpm check:boundaries && pnpm test:unit && EVAL_MODE=mock pnpm
 
 ---
 
-## Phase 7 — Approval policies (Sprint 4) 🔲
+## Phase 7 — Approval policies + team settings (Sprint 4) 🟡
 
-- [ ] Policy rules per tool pattern (glob / toolkit / action)
+First non-manual slice is implemented:
+
+| Deliverable | Path |
+| ----------- | ---- |
+| Pure wildcard evaluator | [lib/aig/approval-policy.ts](lib/aig/approval-policy.ts) |
+| Policy/rule schema | [lib/db/schema.ts](lib/db/schema.ts), [lib/db/migrations/0003_approval_policies.sql](lib/db/migrations/0003_approval_policies.sql) |
+| DB queries | [lib/db/approval-policy-queries.ts](lib/db/approval-policy-queries.ts) |
+| API routes | [app/api/approval-policies/](app/api/approval-policies) |
+| Settings UI | [components/settings/approval-policies-panel.tsx](components/settings/approval-policies-panel.tsx) |
+| Approve-time enforcement | [app/api/intents/[id]/approve/route.ts](app/api/intents/[id]/approve/route.ts) |
+| Team/member Settings UI | [components/settings/team-panel.tsx](components/settings/team-panel.tsx), [app/api/team/](app/api/team) |
+| Unit coverage | [tests/unit/approval-policy.test.ts](tests/unit/approval-policy.test.ts) |
+
+Remaining Sprint 4 work:
+
 - [ ] Reviewer roles beyond org owner/admin
-- [ ] Team invites + member management in Settings
-- [ ] Replace Settings approvals/team empty states
+- [x] Team invites + member management in Settings
+- [ ] Audit-log filtering/export from policy decisions
 
-Data model is ready: `intents.approved_by_user_id`, workspace membership via
-Better Auth org. New tables expected: `approval_policies`, `policy_rules`.
-Will require an ADR amendment to ADR-0009.
+Data model now includes `approval_policies` + `approval_policy_rules`; matched
+rules are written into the `human_approved` mutation payload. Team settings read
+Better Auth `member` rows and create/remove pending `invitation` rows.
 
 ---
 
-## Phase 8 — Remaining product gaps 🔲
+## Phase 8 — Remaining product gaps 🟡
 
-- [ ] **Add action / replan** — API + UI to insert a new tool call into an
-      existing intent and trigger constrained repair. Repair engine already
-      supports this shape; needs a route and a side-panel affordance.
-- [ ] **Pipeline-first creation** — `/app/new` flow that lists pipelines and
-      lets a user kick off a run from a template, not only freeform plan.
-- [ ] **Seeded demo pipeline** — onboarding artifact for new tenants.
+- [x] **Add action / replan** — side panel can insert a new tool call, write a
+      `human_added` trace entry, and repair downstream dependents when anchored
+      after an existing action.
+- [x] **Pipeline-first creation** — dashboard now lists the newest pipelines
+      and lets a user kick off a run from a template, not only freeform plan.
+- [x] **Seeded demo pipeline** — new workspaces get a starter lead-follow-up
+      pipeline addressed to the operator.
 
 ---
 

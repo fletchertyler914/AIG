@@ -1,7 +1,7 @@
-import { Cog } from 'lucide-react'
+import { ApprovalPoliciesPanel } from '@/components/settings/approval-policies-panel'
 import { AuthProvidersPanel } from '@/components/settings/auth-providers-panel'
+import { TeamPanel } from '@/components/settings/team-panel'
 import { Container } from '@/components/ui/container'
-import { EmptyState } from '@/components/ui/empty-state'
 import { PageHeader } from '@/components/ui/page-header'
 import { canManageSharedConnections, resolveWorkspaceContext } from '@/lib/auth/session'
 
@@ -19,11 +19,9 @@ export default async function SettingsPage() {
 
       {canManageProviders ? <AuthProvidersPanel /> : null}
 
-      <EmptyState
-        icon={Cog}
-        title="Approval policies and team invites ship in Sprint 4"
-        description="Policy rules per tool pattern, reviewer roles, and member/invitation management for your workspace."
-      />
+      <ApprovalPoliciesPanel />
+
+      <TeamPanel />
     </Container>
   )
 }

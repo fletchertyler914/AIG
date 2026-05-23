@@ -8,6 +8,7 @@ import {
   appendMutation,
   editToolCallArgs,
   getIntentWithTrace,
+  insertHumanToolCall,
   insertReplacementToolCalls,
   invalidateToolCalls,
   setIntentStatus,
@@ -35,6 +36,14 @@ const mutateSchema = z.discriminatedUnion('type', [
     args: z.record(z.string(), z.unknown()),
     reason: z.string().optional(),
   }),
+  z.object({
+    type: z.literal('add'),
+    tool: z.string().min(1),
+    args: z.record(z.string(), z.unknown()),
+    dependsOn: z.array(z.string()).default([]),
+    afterToolCallId: z.string().min(1).optional(),
+    reason: z.string().optional(),
+  }),
 ])
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -44,12 +53,12 @@ function asRecord(value: unknown): Record<string, unknown> {
   return {}
 }
 
-function humanEditedIds(mutations: Mutation[]): Set<string> {
+function humanControlledIds(mutations: Mutation[]): Set<string> {
   const ids = new Set<string>()
   for (const mutation of mutations) {
-    if (mutation.type !== 'human_edited') continue
+    if (mutation.type !== 'human_edited' && mutation.type !== 'human_added') continue
     const payload = asRecord(mutation.payload)
-    const id = payload['toolCallId']
+    const id = payload['toolCallId'] ?? payload['insertedToolCallId']
     if (typeof id === 'string') ids.add(id)
   }
   return ids
@@ -105,7 +114,7 @@ async function regenerate(input: { intentId: string; seedIds: Set<string>; reaso
   const nextSnapshot = await getIntentWithTrace(input.intentId)
   if (!nextSnapshot) throw new Error('Intent not found')
 
-  const editedIds = humanEditedIds(nextSnapshot.mutations)
+  const editedIds = humanControlledIds(nextSnapshot.mutations)
   const invalidatedNodes = nextSnapshot.toolCalls
     .filter((call) => invalidatedIds.has(call.id))
     .map((call) => repairNode(call, editedIds))
@@ -153,7 +162,45 @@ export async function POST(request: Request, context: RouteContext) {
 
     await maybeTransitionForMutation(id, snapshot.intent.status)
 
-    if (body.type === 'remove') {
+    if (body.type === 'add') {
+      const dependsOn = Array.from(
+        new Set([...(body.afterToolCallId ? [body.afterToolCallId] : []), ...body.dependsOn]),
+      )
+      const inserted = await insertHumanToolCall({
+        intentId: id,
+        tool: body.tool,
+        args: body.args,
+        dependsOn,
+      })
+
+      await appendMutation({
+        intentId: id,
+        type: 'human_added',
+        actor: 'human',
+        payload: {
+          insertedToolCallId: inserted.id,
+          tool: inserted.tool,
+          args: body.args,
+          dependsOn,
+          reason: body.reason ?? null,
+        },
+      })
+
+      const seedIds = body.afterToolCallId
+        ? new Set(directDependents(snapshot.toolCalls, body.afterToolCallId))
+        : new Set<string>()
+      if (seedIds.size > 0) {
+        await regenerate({
+          intentId: id,
+          seedIds,
+          reason:
+            body.reason ??
+            `Human added ${body.tool}; update downstream actions to account for the new action.`,
+        })
+      } else {
+        await setIntentStatus(id, 'PENDING_REVIEW')
+      }
+    } else if (body.type === 'remove') {
       await appendMutation({
         intentId: id,
         type: 'human_removed',

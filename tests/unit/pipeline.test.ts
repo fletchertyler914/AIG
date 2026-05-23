@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildPipelineTemplate, canPromoteIntentStatus } from '@/lib/aig/pipeline'
+import {
+  buildPipelineTemplate,
+  buildSeedPipelineTemplate,
+  canPromoteIntentStatus,
+} from '@/lib/aig/pipeline'
 import {
   intentStatusDisplay,
   readPendingAuthCount,
@@ -76,6 +80,16 @@ describe('buildPipelineTemplate', () => {
     })
 
     expect(template.toolCalls[1]?.dependsOn).toEqual(['@0'])
+  })
+})
+
+describe('buildSeedPipelineTemplate', () => {
+  it('creates a runnable onboarding template addressed to the operator', () => {
+    const template = buildSeedPipelineTemplate('operator@example.com')
+
+    expect(template.toolCalls).toHaveLength(3)
+    expect(template.toolCalls[1]?.dependsOn).toEqual(['@0'])
+    expect(template.toolCalls[2]?.args).toMatchObject({ recipient: 'operator@example.com' })
   })
 })
 

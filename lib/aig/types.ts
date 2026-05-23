@@ -47,6 +47,7 @@ export const MUTATION_TYPES = [
   'agent_regenerated',
   'system_invalidated',
   'system_expired',
+  'human_added',
   'human_removed',
   'human_edited',
   'human_approved',

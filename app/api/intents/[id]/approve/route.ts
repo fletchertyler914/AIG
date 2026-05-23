@@ -1,7 +1,9 @@
 import { z } from 'zod'
+import { evaluateApprovalPolicies } from '@/lib/aig/approval-policy'
 import { executeApprovedIntent } from '@/lib/aig/executor'
 import { jsonError, jsonOk, messageFromUnknown, parseJson } from '@/lib/api/http'
 import { requireSession, resolveWorkspaceContext } from '@/lib/auth/session'
+import { listApprovalPoliciesForWorkspace } from '@/lib/db/approval-policy-queries'
 import { appendMutation, getIntentWithTrace, markIntentApproved } from '@/lib/db/queries'
 import { isE2eAuthSkipped } from '@/lib/env'
 import { logger } from '@/lib/logger'
@@ -25,15 +27,33 @@ export async function POST(request: Request, context: RouteContext) {
 
     let approvedBy: string
     let approvedByUserId: string | null
+    const ctx = await resolveWorkspaceContext()
 
     if (isE2eAuthSkipped) {
-      const ctx = await resolveWorkspaceContext()
       approvedBy = ctx.email || 'e2e-operator'
       approvedByUserId = null
     } else {
       const session = await requireSession()
       approvedBy = session.user.email
       approvedByUserId = session.user.id
+    }
+
+    const trace = await getIntentWithTrace(id)
+    if (!trace || trace.intent.workspaceId !== ctx.workspace.id) {
+      return jsonError('Intent not found', 404)
+    }
+
+    const policies = await listApprovalPoliciesForWorkspace(ctx.workspace.id)
+    const policyDecision = evaluateApprovalPolicies({
+      policies,
+      toolCalls: trace.toolCalls.map((toolCall) => ({
+        id: toolCall.id,
+        tool: toolCall.tool,
+      })),
+      approverRole: ctx.memberRole,
+    })
+    if (!policyDecision.ok) {
+      return jsonError(policyDecision.error ?? 'Approval blocked by workspace policy', 403)
     }
 
     const approved = await markIntentApproved(id, approvedBy, approvedByUserId)
@@ -47,6 +67,7 @@ export async function POST(request: Request, context: RouteContext) {
         approvedBy,
         approvedByUserId,
         execute: body.execute,
+        policiesMatched: policyDecision.matchedRules,
       },
     })
 

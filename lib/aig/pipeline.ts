@@ -80,6 +80,55 @@ export function buildPipelineTemplate(input: {
   }
 }
 
+export function buildSeedPipelineTemplate(operatorEmail: string): PipelineTemplate {
+  return {
+    label: 'Lead follow-up and next-step coordination',
+    description:
+      'Send a lead follow-up, schedule a next-step call, and notify yourself with a summary.',
+    objective: 'Coordinate lead follow-up while preserving human control over real-world actions.',
+    systems: ['Gmail', 'GoogleCalendar'],
+    confidence: 0.9,
+    toolCalls: [
+      {
+        tool: 'Gmail.SendEmail@7.0.0',
+        args: {
+          recipient: operatorEmail,
+          subject: 'Following up on next steps',
+          body: 'Hi team, following up on our conversation. Are you open to a short intro call next week?',
+          content_type: 'plain',
+        },
+        dependsOn: [],
+        position: 0,
+      },
+      {
+        tool: 'GoogleCalendar.CreateEvent@3.3.2',
+        args: {
+          summary: 'Intro call',
+          attendee_emails: [operatorEmail],
+          start_datetime: '2026-05-26T15:00:00-05:00',
+          end_datetime: '2026-05-26T15:30:00-05:00',
+          calendar_id: 'primary',
+          send_notifications_to_attendees: 'none',
+          add_google_meet: true,
+        },
+        dependsOn: ['@0'],
+        position: 1,
+      },
+      {
+        tool: 'Gmail.SendEmail@7.0.0',
+        args: {
+          recipient: operatorEmail,
+          subject: 'AIG pipeline run summary',
+          body: 'Lead follow-up sent and next-step call scheduled. This final action gives you a downstream node to inspect or repair.',
+          content_type: 'plain',
+        },
+        dependsOn: ['@1'],
+        position: 2,
+      },
+    ],
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     return value as Record<string, unknown>

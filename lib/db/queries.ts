@@ -336,6 +336,38 @@ export async function editToolCallArgs(
   return row ?? null
 }
 
+export async function insertHumanToolCall(input: {
+  intentId: string
+  tool: string
+  args: Record<string, unknown>
+  dependsOn: string[]
+}): Promise<ToolCall> {
+  return db.transaction(async (tx) => {
+    const [{ nextPosition } = { nextPosition: 0 }] = await tx
+      .select({
+        nextPosition: sql<number>`coalesce(max(${toolCalls.position}), -1) + 1`,
+      })
+      .from(toolCalls)
+      .where(eq(toolCalls.intentId, input.intentId))
+
+    const [row] = await tx
+      .insert(toolCalls)
+      .values({
+        id: ulid(),
+        intentId: input.intentId,
+        tool: input.tool,
+        args: input.args,
+        dependsOn: input.dependsOn,
+        position: nextPosition,
+        rollbackPolicy: 'HALT_REMAINING',
+      })
+      .returning()
+
+    if (!row) throw new Error('failed to insert tool call')
+    return row
+  })
+}
+
 export async function setToolCallStatus(
   toolCallId: string,
   next: ToolCallStatus,

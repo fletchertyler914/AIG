@@ -4,7 +4,7 @@
 
 import { and, desc, eq, max, sql } from 'drizzle-orm'
 import { ulid } from 'ulid'
-import type { PipelineTemplate } from '@/lib/aig/pipeline'
+import { buildSeedPipelineTemplate, type PipelineTemplate } from '@/lib/aig/pipeline'
 import { db } from '@/lib/db/client'
 import { type Pipeline, pipelines } from '@/lib/db/schema'
 
@@ -82,4 +82,23 @@ export async function countPipelinesForWorkspace(workspaceId: string): Promise<n
     .from(pipelines)
     .where(eq(pipelines.workspaceId, workspaceId))
   return row?.count ?? 0
+}
+
+export async function ensureSeedPipelineForWorkspace(input: {
+  workspaceId: string
+  operatorEmail: string
+  createdByUserId?: string | null
+}): Promise<Pipeline | null> {
+  if ((await countPipelinesForWorkspace(input.workspaceId)) > 0) return null
+
+  const template = buildSeedPipelineTemplate(input.operatorEmail)
+  return createPipeline({
+    workspaceId: input.workspaceId,
+    name: template.label,
+    description: template.description,
+    objective: template.objective,
+    systems: template.systems,
+    template,
+    createdByUserId: input.createdByUserId ?? null,
+  })
 }

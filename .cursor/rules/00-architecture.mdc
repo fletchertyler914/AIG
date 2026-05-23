@@ -42,6 +42,9 @@ boundaries every change must respect.
 | Connections list-time Arcade re-check | `app/api/connections/route.ts` (`syncPendingConnections`) |
 | Pipelines (templates promoted from runs) | `lib/db/pipeline-queries.ts`, `lib/aig/pipeline.ts` |
 | Insights (read-only stats) | `lib/db/insights-queries.ts` |
+| Approval policies | `lib/aig/approval-policy.ts` (pure), `lib/db/approval-policy-queries.ts` (DB), `app/api/approval-policies/**` |
+| Team/member settings | `lib/db/team-queries.ts`, `app/api/team/**`, `components/settings/team-panel.tsx` |
+| Add-action / replan | `app/api/intents/[id]/mutate/route.ts`, `lib/db/queries.ts` (`insertHumanToolCall`) |
 | Session-gate proxy (Next 16) | `proxy.ts` (was `middleware.ts`) |
 | Import boundary CI | `scripts/check-boundaries.ts` (`pnpm check:boundaries`) |
 

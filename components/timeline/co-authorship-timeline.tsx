@@ -1,6 +1,15 @@
 'use client'
 
-import { Bot, CheckCircle2, CircleAlert, PenLine, ShieldCheck, Trash2, Zap } from 'lucide-react'
+import {
+  Bot,
+  CheckCircle2,
+  CircleAlert,
+  PenLine,
+  PlusCircle,
+  ShieldCheck,
+  Trash2,
+  Zap,
+} from 'lucide-react'
 import type { ComponentType } from 'react'
 import type { MutationDto } from '@/components/intent/types'
 import { asRecord } from '@/components/intent/types'
@@ -23,6 +32,11 @@ const eventStyles: Record<
     label: 'Human removed action',
     className: 'border-aig-removed/30 bg-aig-removed/10 text-aig-removed',
     icon: Trash2,
+  },
+  human_added: {
+    label: 'Human added action',
+    className: 'border-aig-edited/30 bg-aig-edited/10 text-aig-edited',
+    icon: PlusCircle,
   },
   human_edited: {
     label: 'Human edited action',
@@ -68,6 +82,11 @@ function summarizePayload(type: string, payload: unknown): string {
   }
   if (type === 'human_removed' || type === 'human_edited') {
     return `${String(p['toolCallId'] ?? 'unknown action')}${
+      p['reason'] ? ` · ${String(p['reason'])}` : ''
+    }`
+  }
+  if (type === 'human_added') {
+    return `${String(p['tool'] ?? p['insertedToolCallId'] ?? 'new action')}${
       p['reason'] ? ` · ${String(p['reason'])}` : ''
     }`
   }

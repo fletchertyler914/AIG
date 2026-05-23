@@ -14,6 +14,7 @@ interface IntentTraceDrawerProps {
 
 const EVENT_LABELS: Record<string, string> = {
   agent_proposed: 'Agent proposed intent',
+  human_added: 'Human added action',
   human_removed: 'Human removed action',
   human_edited: 'Human edited action',
   system_invalidated: 'System invalidated dependents',
@@ -27,6 +28,9 @@ function previewText(mutation: MutationDto): string {
   const p = asRecord(mutation.payload)
   if (mutation.type === 'human_removed' || mutation.type === 'human_edited') {
     return `${label} · ${String(p['toolCallId'] ?? '')}`
+  }
+  if (mutation.type === 'human_added') {
+    return `${label} · ${String(p['insertedToolCallId'] ?? '')}`
   }
   return label
 }

@@ -68,6 +68,7 @@ lib/aig/                PURE DOMAIN. No fetch, no fs, no env, no DB, no Arcade.
   ├── repair.ts         Constrained regeneration. Takes/returns plain data.
   ├── executor.ts       Execution ordering (orchestrates via injected wrappers).
   ├── connection-auth.ts  Pure connection-scope validation for execution.
+  ├── approval-policy.ts  Pure policy matching for approve-time gates.
   ├── expire.ts         TTL / expiry rules.
   └── prompts/          System prompts as .md files.
 lib/arcade/             ONLY place that imports `@arcadeai/arcadejs`.
@@ -94,6 +95,7 @@ lib/db/                 ONLY place that imports `drizzle-orm`.
   ├── client.ts
   ├── queries.ts        Intent graph queries.
   ├── connection-queries.ts  Toolkit connections + resolveConnectionForTool().
+  ├── approval-policy-queries.ts  Workspace approval policies + rules.
   ├── workspace-queries.ts
   └── migrations/
 lib/ai/                 ONLY place that imports `ai` or `@ai-sdk/*`.
@@ -190,11 +192,37 @@ OAuth UX invariants:
 
 ---
 
+## 3d. Approval policies
+
+Workspace approval policies are coarse Sprint 4 gates:
+
+- Stored in `approval_policies` + `approval_policy_rules`.
+- Managed by workspace owner/admin from Settings.
+- Evaluated in `POST /api/intents/[id]/approve` before `markIntentApproved()`.
+- Pure matching lives in `lib/aig/approval-policy.ts`; DB reads live in
+  `lib/db/approval-policy-queries.ts`.
+
+Rules match Arcade tool names with `*` wildcards (for example
+`Gmail.SendEmail*`, `Slack.*`, `*`) and take one of two actions:
+
+| Action | Behavior |
+| ------ | -------- |
+| `require_admin_approval` | Intent can be approved only by org owner/admin |
+| `block` | Intent cannot be approved while the rule is enabled |
+
+Team settings are backed by Better Auth `member` + `invitation` tables. The UI
+is read-only for members and lets owner/admin users create or remove pending
+invites.
+
+---
+
 ## 4. State machine invariants
 
 - Never bypass `assertTransition()` when updating intent status.
 - Approved or done `ToolCall`s are **immutable**. Their `args` may not be
   modified. Repair must include them verbatim in `preserve`.
+- Human-added actions write a `human_added` mutation, become preserved nodes
+  during downstream repair, and should not bypass the co-authorship trace.
 - The intent `objective` is set at FORMED time and **never changes**. Repair
   receives it as a locked input, never as something the model may rewrite.
 - Mutations are append-only. Never UPDATE or DELETE a `mutations` row.

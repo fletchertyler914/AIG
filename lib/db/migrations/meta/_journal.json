@@ -22,6 +22,20 @@
       "when": 1779450000000,
       "tag": "0002_pipelines",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779460000000,
+      "tag": "0003_approval_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779470000000,
+      "tag": "0004_human_added_mutation",
+      "breakpoints": true
     }
   ]
 }

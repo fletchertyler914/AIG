@@ -9,6 +9,7 @@
  */
 
 import { ulid } from 'ulid'
+import { ensureSeedPipelineForWorkspace } from '@/lib/db/pipeline-queries'
 import {
   findOrganizationIdForUser,
   insertOrganization,
@@ -49,6 +50,11 @@ export async function provisionTenantForUser(input: {
     const production = workspaces.find((w) => w.kind === 'production') ?? workspaces[0] ?? null
 
     if (production) {
+      await ensureSeedPipelineForWorkspace({
+        workspaceId: production.id,
+        operatorEmail: input.email,
+        createdByUserId: input.userId,
+      })
       return { organizationId: orgId, workspace: production }
     }
 
@@ -57,6 +63,11 @@ export async function provisionTenantForUser(input: {
       name: 'Production',
       slug: 'production',
       kind: 'production',
+      createdByUserId: input.userId,
+    })
+    await ensureSeedPipelineForWorkspace({
+      workspaceId: created.id,
+      operatorEmail: input.email,
       createdByUserId: input.userId,
     })
     return { organizationId: orgId, workspace: created }
@@ -91,6 +102,12 @@ export async function provisionTenantForUser(input: {
     name: 'Production',
     slug: 'production',
     kind: 'production',
+    createdByUserId: input.userId,
+  })
+
+  await ensureSeedPipelineForWorkspace({
+    workspaceId: workspace.id,
+    operatorEmail: input.email,
     createdByUserId: input.userId,
   })
 

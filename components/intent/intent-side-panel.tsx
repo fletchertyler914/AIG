@@ -1,7 +1,7 @@
 'use client'
 
-import { ExternalLink, ShieldAlert } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { ExternalLink, Plus, ShieldAlert } from 'lucide-react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { ToolCallArgsEditor } from '@/components/intent/tool-call-args-editor'
 import type { ToolCallDto } from '@/components/intent/types'
@@ -44,7 +44,7 @@ export function IntentSidePanel({
   onChanged,
 }: IntentSidePanelProps) {
   const selected = toolCalls.find((tc) => tc.id === selectedId) ?? null
-  const [tab, setTab] = useState<'overview' | 'details'>(selected ? 'details' : 'overview')
+  const [tab, setTab] = useState<'overview' | 'details' | 'add'>(selected ? 'details' : 'overview')
   const byId = new Map(toolCalls.map((tc) => [tc.id, tc]))
   const awaitingAuthRef = useRef(false)
 
@@ -72,12 +72,13 @@ export function IntentSidePanel({
       <CardContent className="flex flex-1 flex-col gap-4 p-4 sm:p-5">
         <Tabs
           value={tab}
-          onValueChange={(v) => setTab(v as 'overview' | 'details')}
+          onValueChange={(v) => setTab(v as 'overview' | 'details' | 'add')}
           className="flex flex-1 flex-col gap-4"
         >
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="add">Add action</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="flex-1 space-y-4 overflow-auto">
@@ -216,9 +217,161 @@ export function IntentSidePanel({
               </div>
             )}
           </TabsContent>
+
+          <TabsContent value="add" className="flex-1 overflow-auto">
+            <AddActionForm
+              toolCalls={toolCalls}
+              selected={selected}
+              onChanged={onChanged}
+              onDone={() => setTab('details')}
+            />
+          </TabsContent>
         </Tabs>
       </CardContent>
     </Card>
+  )
+}
+
+function AddActionForm({
+  toolCalls,
+  selected,
+  onChanged,
+  onDone,
+}: {
+  toolCalls: ToolCallDto[]
+  selected: ToolCallDto | null
+  onChanged: () => Promise<void>
+  onDone: () => void
+}) {
+  const [tool, setTool] = useState('')
+  const [argsJson, setArgsJson] = useState('{\n  \n}')
+  const [afterToolCallId, setAfterToolCallId] = useState(selected?.id ?? '')
+  const [reason, setReason] = useState('')
+  const [pending, startTransition] = useTransition()
+
+  useEffect(() => {
+    if (selected) setAfterToolCallId(selected.id)
+  }, [selected])
+
+  const addAction = () => {
+    const trimmedTool = tool.trim()
+    if (!trimmedTool) {
+      toast.error('Enter an Arcade tool name first.')
+      return
+    }
+
+    let args: Record<string, unknown>
+    try {
+      const parsed = JSON.parse(argsJson) as unknown
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        toast.error('Args must be a JSON object.')
+        return
+      }
+      args = parsed as Record<string, unknown>
+    } catch {
+      toast.error('Args must be valid JSON.')
+      return
+    }
+
+    startTransition(async () => {
+      const res = await fetch(`/api/intents/${toolCalls[0]?.intentId ?? ''}/mutate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'add',
+          tool: trimmedTool,
+          args,
+          ...(afterToolCallId ? { afterToolCallId } : {}),
+          ...(reason.trim() ? { reason: reason.trim() } : {}),
+        }),
+      })
+      if (!res.ok) {
+        toast.error(await res.text())
+        return
+      }
+      toast.success('Action added — downstream graph repaired.')
+      setTool('')
+      setArgsJson('{\n  \n}')
+      setReason('')
+      await onChanged()
+      onDone()
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+          Add action
+        </p>
+        <p className="mt-1 text-muted-foreground text-xs leading-relaxed">
+          Insert a new Arcade tool call. If you anchor it after an existing action, AIG repairs
+          downstream dependents so the graph accounts for the addition.
+        </p>
+      </div>
+
+      <label className="block space-y-1">
+        <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+          Tool
+        </span>
+        <input
+          className="h-9 w-full rounded-md border border-border bg-background px-3 font-mono text-sm outline-none focus:border-ring"
+          disabled={pending}
+          onChange={(event) => setTool(event.target.value)}
+          placeholder="Gmail.SendEmail@7.0.0"
+          value={tool}
+        />
+      </label>
+
+      <label className="block space-y-1">
+        <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+          After
+        </span>
+        <select
+          className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-ring"
+          disabled={pending}
+          onChange={(event) => setAfterToolCallId(event.target.value)}
+          value={afterToolCallId}
+        >
+          <option value="">No dependency</option>
+          {toolCalls.map((toolCall) => (
+            <option key={toolCall.id} value={toolCall.id}>
+              {formatToolActionTitle(toolCall.tool)}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="block space-y-1">
+        <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+          Args JSON
+        </span>
+        <textarea
+          className="min-h-32 w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-ring"
+          disabled={pending}
+          onChange={(event) => setArgsJson(event.target.value)}
+          value={argsJson}
+        />
+      </label>
+
+      <label className="block space-y-1">
+        <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+          Reason
+        </span>
+        <input
+          className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-ring"
+          disabled={pending}
+          onChange={(event) => setReason(event.target.value)}
+          placeholder="e.g. Notify the owner before the customer email"
+          value={reason}
+        />
+      </label>
+
+      <Button disabled={pending || toolCalls.length === 0} onClick={addAction} className="w-full">
+        <Plus className="size-4" />
+        {pending ? 'Adding…' : 'Add and replan'}
+      </Button>
+    </div>
   )
 }
 

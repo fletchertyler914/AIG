@@ -84,6 +84,7 @@ export const mutationTypeEnum = pgEnum('mutation_type', [
   'agent_regenerated',
   'system_invalidated',
   'system_expired',
+  'human_added',
   'human_removed',
   'human_edited',
   'human_approved',
@@ -107,6 +108,11 @@ export const connectionAuthStatusEnum = pgEnum('connection_auth_status', [
 ])
 
 export const connectionScopeEnum = pgEnum('connection_scope', ['personal', 'shared'])
+
+export const approvalPolicyActionEnum = pgEnum('approval_policy_action', [
+  'require_admin_approval',
+  'block',
+])
 
 // ── Tenancy extensions ───────────────────────────────────────────────────────
 
@@ -396,6 +402,56 @@ export const pipelines = pgTable(
   ],
 )
 
+/**
+ * Workspace approval policies are evaluated before an intent can be approved.
+ * They are intentionally coarse for Sprint 4: match tool names with wildcard
+ * patterns and either require an owner/admin approver or block approval.
+ */
+export const approvalPolicies = pgTable(
+  'approval_policies',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    enabled: boolean('enabled').notNull().default(true),
+    createdByUserId: text('created_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: bigint('created_at', { mode: 'number' })
+      .notNull()
+      .default(sql`(extract(epoch from now()) * 1000)::bigint`),
+    updatedAt: bigint('updated_at', { mode: 'number' })
+      .notNull()
+      .default(sql`(extract(epoch from now()) * 1000)::bigint`),
+  },
+  (t) => [
+    uniqueIndex('approval_policies_workspace_name_uq').on(t.workspaceId, t.name),
+    index('approval_policies_workspace_idx').on(t.workspaceId),
+  ],
+)
+
+export const approvalPolicyRules = pgTable(
+  'approval_policy_rules',
+  {
+    id: text('id').primaryKey(),
+    policyId: text('policy_id')
+      .notNull()
+      .references(() => approvalPolicies.id, { onDelete: 'cascade' }),
+    toolPattern: text('tool_pattern').notNull(),
+    action: approvalPolicyActionEnum('action').notNull(),
+    createdAt: bigint('created_at', { mode: 'number' })
+      .notNull()
+      .default(sql`(extract(epoch from now()) * 1000)::bigint`),
+  },
+  (t) => [
+    index('approval_policy_rules_policy_idx').on(t.policyId),
+    index('approval_policy_rules_pattern_idx').on(t.toolPattern),
+  ],
+)
+
 // ── Inferred types ───────────────────────────────────────────────────────────
 
 export type Workspace = typeof workspaces.$inferSelect
@@ -421,3 +477,9 @@ export type NewExecutionRecord = typeof executionRecords.$inferInsert
 
 export type Pipeline = typeof pipelines.$inferSelect
 export type NewPipeline = typeof pipelines.$inferInsert
+
+export type ApprovalPolicy = typeof approvalPolicies.$inferSelect
+export type NewApprovalPolicy = typeof approvalPolicies.$inferInsert
+export type ApprovalPolicyRule = typeof approvalPolicyRules.$inferSelect
+export type NewApprovalPolicyRule = typeof approvalPolicyRules.$inferInsert
+export type ApprovalPolicyAction = (typeof approvalPolicyActionEnum.enumValues)[number]

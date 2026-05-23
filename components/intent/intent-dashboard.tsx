@@ -1,10 +1,11 @@
 'use client'
 
-import { ArrowRight, ChevronRight, Inbox, PlayCircle } from 'lucide-react'
+import { ArrowRight, ChevronRight, GitBranch, Inbox, PlayCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
+import type { PipelineDto } from '@/app/api/pipelines/route'
 import type { IntentDto } from '@/components/intent/types'
 import { IntentDisplayBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,11 +22,22 @@ interface ListResponse {
   intents: IntentDto[]
 }
 
+interface PipelinesResponse {
+  pipelines: PipelineDto[]
+}
+
 async function listIntents(): Promise<IntentDto[]> {
   const res = await fetch('/api/intents', { cache: 'no-store' })
   if (!res.ok) throw new Error(await res.text())
   const body = (await res.json()) as ListResponse
   return body.intents
+}
+
+async function listPipelines(): Promise<PipelineDto[]> {
+  const res = await fetch('/api/pipelines', { cache: 'no-store' })
+  if (!res.ok) throw new Error(await res.text())
+  const body = (await res.json()) as PipelinesResponse
+  return body.pipelines
 }
 
 const PROMPT_PLACEHOLDER =
@@ -61,7 +73,9 @@ function formatTimestamp(ms: number): string {
 export function IntentDashboard() {
   const router = useRouter()
   const [intents, setIntents] = useState<IntentDto[]>([])
+  const [pipelines, setPipelines] = useState<PipelineDto[]>([])
   const [prompt, setPrompt] = useState('')
+  const [pendingPipelineId, setPendingPipelineId] = useState<string | null>(null)
   const [isPlanning, startPlanning] = useTransition()
   const [isRunningDemo, startDemo] = useTransition()
 
@@ -70,6 +84,11 @@ export function IntentDashboard() {
       .then(setIntents)
       .catch((error: unknown) => {
         toast.error(error instanceof Error ? error.message : 'Failed to load intents')
+      })
+    void listPipelines()
+      .then(setPipelines)
+      .catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to load pipelines')
       })
   }, [])
 
@@ -106,7 +125,23 @@ export function IntentDashboard() {
     })
   }
 
-  const busy = isPlanning || isRunningDemo
+  const runPipeline = (pipelineId: string) => {
+    setPendingPipelineId(pipelineId)
+    startPlanning(async () => {
+      const res = await fetch(`/api/pipelines/${encodeURIComponent(pipelineId)}/run`, {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        toast.error(await res.text())
+        setPendingPipelineId(null)
+        return
+      }
+      const body = (await res.json()) as { intentId: string }
+      router.push(`/app/intent/${body.intentId}`)
+    })
+  }
+
+  const busy = isPlanning || isRunningDemo || pendingPipelineId !== null
 
   return (
     <Container width="page" className="flex flex-col gap-8 py-8 sm:py-10">
@@ -190,6 +225,62 @@ export function IntentDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {pipelines.length > 0 ? (
+        <Card>
+          <CardContent className="space-y-4 p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="size-4 text-primary" />
+                  <p className="font-medium text-sm">Start from pipeline</p>
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  Launch a new review run from a saved template.
+                </p>
+              </div>
+              <Link
+                href="/app/pipelines"
+                className="inline-flex items-center gap-1 text-muted-foreground text-xs hover:text-foreground"
+              >
+                View all
+                <ChevronRight className="size-3" />
+              </Link>
+            </div>
+
+            <div className="grid gap-2">
+              {pipelines.slice(0, 3).map((pipeline) => (
+                <div
+                  key={pipeline.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-1/30 p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate font-medium text-sm">{pipeline.name}</p>
+                      <span className="font-mono text-[10px] text-muted-foreground uppercase">
+                        v{pipeline.version}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-muted-foreground text-xs">
+                      {pipeline.toolCount} tools ·{' '}
+                      {pipeline.systems.map(formatToolkitDisplayName).join(', ')}
+                    </p>
+                  </div>
+                  <Button
+                    disabled={busy}
+                    onClick={() => runPipeline(pipeline.id)}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    <PlayCircle className="size-3.5" />
+                    {pendingPipelineId === pipeline.id ? 'Starting…' : 'Run'}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <section className="space-y-4">
         <SectionHeader
